@@ -1,0 +1,9 @@
+{
+  "name": "ship",
+  "description": "Publish a plan as a GitHub Issue and create a branch to start implementation",
+  "version": "1.0.0",
+  "author": {
+    "name": "Winston Zhao"
+  },
+  "repository": "https://github.com/snoolord/skills"
+}

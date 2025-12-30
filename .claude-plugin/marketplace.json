@@ -1,0 +1,36 @@
+{
+  "name": "github-workflow-skills",
+  "owner": {
+    "name": "Winston Zhao",
+    "email": "winstonzhao@ucla.edu"
+  },
+  "metadata": {
+    "description": "GitHub workflow automation skills for issue management, branching, PRs, and team coordination"
+  },
+  "plugins": [
+    {
+      "name": "done",
+      "source": "./plugins/done",
+      "description": "Clean up after a PR is merged - delete branches and confirm issue closure",
+      "version": "1.0.0"
+    },
+    {
+      "name": "pr",
+      "source": "./plugins/pr",
+      "description": "Create a Pull Request for the current issue branch",
+      "version": "1.0.0"
+    },
+    {
+      "name": "ship",
+      "source": "./plugins/ship",
+      "description": "Publish a plan as a GitHub Issue and create a branch to start implementation",
+      "version": "1.0.0"
+    },
+    {
+      "name": "work",
+      "source": "./plugins/work",
+      "description": "Show GitHub Issues dashboard - what everyone is working on, open PRs, and backlog",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "work",
+  "description": "Show GitHub Issues dashboard - what everyone is working on, open PRs, and backlog",
+  "version": "1.0.0",
+  "author": {
+    "name": "Winston Zhao"
+  },
+  "repository": "https://github.com/snoolord/skills"
+}

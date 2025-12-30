@@ -1,0 +1,9 @@
+{
+  "name": "pr",
+  "description": "Create a Pull Request for the current issue branch",
+  "version": "1.0.0",
+  "author": {
+    "name": "Winston Zhao"
+  },
+  "repository": "https://github.com/snoolord/skills"
+}

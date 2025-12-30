@@ -1,0 +1,9 @@
+{
+  "name": "done",
+  "description": "Clean up after a PR is merged - delete branches and confirm issue closure",
+  "version": "1.0.0",
+  "author": {
+    "name": "Winston Zhao"
+  },
+  "repository": "https://github.com/snoolord/skills"
+}
