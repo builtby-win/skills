@@ -7,7 +7,7 @@ This document explains how to use the GitHub workflow skills in your project.
 ### 1. Install the Skills
 
 ```bash
-/plugin marketplace add github.com/snoolord/skills
+/plugin marketplace add github.com/builtby-win/skills
 /plugin install done pr ship work@github-workflow-skills
 ```
 
@@ -362,4 +362,4 @@ Skills integrate with review tools:
 ## Support
 
 Questions or issues? Open an issue on the skills repository:
-https://github.com/snoolord/skills/issues
+https://github.com/builtby-win/skills/issues

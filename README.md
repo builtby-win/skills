@@ -14,7 +14,7 @@ Claude Code plugin marketplace providing automated GitHub workflow skills for is
 ### Add the Marketplace
 
 ```bash
-/plugin marketplace add github.com/snoolord/skills
+/plugin marketplace add github.com/builtby-win/skills
 ```
 
 ### Install Plugins
@@ -175,7 +175,7 @@ The `/pr` skill supports capturing screenshots of UI changes:
 
 ## Contributing
 
-Found a bug or have a feature request? [Open an issue](https://github.com/snoolord/skills/issues)
+Found a bug or have a feature request? [Open an issue](https://github.com/builtby-win/skills/issues)
 
 ## License
 
