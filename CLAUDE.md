@@ -8,7 +8,7 @@ This document explains how to use the GitHub workflow skills in your project.
 
 ```bash
 /plugin marketplace add github.com/builtby-win/skills
-/plugin install done pr ship work@github-workflow-skills
+/plugin install done pr ship work@builtby-win-skills
 ```
 
 ### 2. Configure Your Project

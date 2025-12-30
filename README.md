@@ -22,16 +22,16 @@ Claude Code plugin marketplace providing automated GitHub workflow skills for is
 Install all skills:
 
 ```bash
-/plugin install done@github-workflow-skills
-/plugin install pr@github-workflow-skills
-/plugin install ship@github-workflow-skills
-/plugin install work@github-workflow-skills
+/plugin install done@builtby-win-skills
+/plugin install pr@builtby-win-skills
+/plugin install ship@builtby-win-skills
+/plugin install work@builtby-win-skills
 ```
 
 Or install individually as needed:
 
 ```bash
-/plugin install done@github-workflow-skills
+/plugin install done@builtby-win-skills
 ```
 
 ## Configuration
