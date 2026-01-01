@@ -1,0 +1,9 @@
+{
+  "name": "note",
+  "description": "Create draft blog posts from learnings in any project",
+  "version": "1.0.0",
+  "author": {
+    "name": "Winston Zhao"
+  },
+  "repository": "https://github.com/builtby-win/skills"
+}
