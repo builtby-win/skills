@@ -43,6 +43,12 @@
       "source": "./plugins/blog",
       "description": "Manage and publish draft blog posts",
       "version": "1.0.0"
+    },
+    {
+      "name": "worktree",
+      "source": "./plugins/worktree",
+      "description": "Set up git worktrees with SQLite database snapshots for parallel development",
+      "version": "1.0.0"
     }
   ]
 }
