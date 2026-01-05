@@ -4,22 +4,28 @@ Claude Code plugin marketplace providing automated GitHub workflow skills for is
 
 ## Features
 
+### Core Workflow Skills
+
 - **`/done`** - Clean up after PR merge (delete branches, verify issue closure)
 - **`/pr`** - Create pull requests with pre-flight checks and optional screenshots
 - **`/ship`** - Publish plans as GitHub issues and create feature branches
 - **`/work`** - Display team dashboard (issues, PRs, backlog)
+
+### Optional Plugins
+
+- **`worktree`** - Git worktree management with SQLite database snapshots and port isolation for parallel development
 
 ## Installation
 
 ### Add the Marketplace
 
 ```bash
-/plugin marketplace add github.com/builtby-win/skills
+/plugin marketplace add builtby-win/skills
 ```
 
 ### Install Plugins
 
-Install all skills:
+Install core workflow skills:
 
 ```bash
 /plugin install done@builtby-win-skills
@@ -28,10 +34,10 @@ Install all skills:
 /plugin install work@builtby-win-skills
 ```
 
-Or install individually as needed:
+Optionally install the worktree plugin for parallel development:
 
 ```bash
-/plugin install done@builtby-win-skills
+/plugin install worktree@builtby-win-skills
 ```
 
 ## Configuration
@@ -161,10 +167,66 @@ gh label create "status:in-review" --color "D93F0B" --description "Under code re
 
 ### Worktrees
 
-If your project uses git worktrees, the skills will detect and integrate with them:
-- `/ship` can create worktrees for isolated development
-- `/done` will clean up worktrees when branches are deleted
-- `/work` will show active worktrees
+For projects with SQLite databases or when you need parallel development, use the worktree plugin:
+
+#### Quick Setup
+
+```bash
+# Install the plugin
+/plugin install worktree@builtby-win-skills
+
+# Set up your project (run once)
+/setup-worktree
+```
+
+#### Features
+
+- **Isolated Development**: Separate git worktrees for each issue/feature
+- **Database Snapshots**: Automatically snapshot SQLite databases for each worktree
+  - Supports Cloudflare D1 (`.wrangler/state/v3/d1/`)
+  - Supports local `.db`, `.sqlite`, `.sqlite3` files
+  - Custom paths via `WORKTREE_DB_PATH` environment variable
+- **Port Management**: Auto-assign unique ports to avoid conflicts (4322, 4323, etc.)
+- **Dev Server Control**: Optionally start dev servers automatically
+- **Package Manager Agnostic**: Works with npm, yarn, or pnpm
+
+#### Usage
+
+```bash
+# Create worktree for issue #15 with dev server
+pnpm worktree create 15 dark-mode --start-server
+
+# List active worktrees
+pnpm worktree list
+
+# Show worktree details
+pnpm worktree info 15
+
+# Delete worktree when done
+pnpm worktree delete 15
+```
+
+#### Integration with Skills
+
+When the worktree script is detected, the skills automatically integrate:
+- **`/ship`** - Creates worktrees for new issues (if project has SQLite databases)
+- **`/done`** - Cleans up worktrees after PR merge
+- **`/work`** - Shows active worktrees in the dashboard
+
+#### When to Use Worktrees
+
+**Use worktrees for:**
+- Database/schema changes requiring isolated state
+- Backend API changes needing separate dev server
+- Parallel work on multiple features
+- Testing migrations before merging
+
+**Use regular branches for:**
+- UI-only changes (styling, components)
+- Documentation updates
+- Simple fixes with no database interaction
+
+See the [worktree plugin README](plugins/worktree/README.md) for full documentation.
 
 ### Screenshots
 

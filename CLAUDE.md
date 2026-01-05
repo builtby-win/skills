@@ -7,8 +7,12 @@ This document explains how to use the GitHub workflow skills in your project.
 ### 1. Install the Skills
 
 ```bash
-/plugin marketplace add github.com/builtby-win/skills
-/plugin install done pr ship work@builtby-win-skills
+/plugin marketplace add builtby-win/skills
+/plugin install done@builtby-win-skills
+/plugin install pr@builtby-win-skills
+/plugin install ship@builtby-win-skills
+/plugin install work@builtby-win-skills
+/plugin install worktree@builtby-win-skills  # Optional: for parallel development
 ```
 
 ### 2. Configure Your Project
@@ -196,20 +200,79 @@ Examples:
 
 ## Project-Specific Customization
 
-### Worktrees
+### Worktrees (Optional)
 
-If your project uses git worktrees, configure:
+For projects with SQLite databases or when you need to work on multiple features in parallel, use git worktrees:
+
+#### Installation
+
+```bash
+# Install the worktree plugin
+/plugin install worktree@builtby-win-skills
+
+# Set up your project (run once per project)
+/setup-worktree
+```
+
+This installs `scripts/manage-worktree.ts` and adds the `worktree` command to your package.json.
+
+#### Configuration
+
+Add to your project's `CLAUDE.md`:
 
 ```markdown
 ## Worktree Configuration
-WORKTREE_ROOT=.worktrees
-START_PORT=4322
+
+- `PROJECT_PREFIX=your-project-name` - Branch naming prefix
+- `WORKTREE_BASE_PORT=4322` - Starting port for dev servers
+- `WORKTREE_MAIN_PORT=4321` - Main worktree dev server port
+- `WORKTREE_DEV_COMMAND=dev` - npm script to start dev server
+
+### When to Use Worktrees
+
+**Use worktrees** (via `pnpm worktree create`):
+- Database/schema changes requiring isolated state
+- Backend API changes needing separate dev server
+- Parallel development on multiple features
+- Testing migrations before merging
+
+**Use regular branches** (simpler):
+- UI-only changes (styling, components)
+- Documentation updates
+- Simple fixes with no database interaction
 ```
 
-The skills will automatically:
-- Create worktrees for new branches
-- Start dev servers on unique ports
-- Clean up on `/done`
+#### Features
+
+The worktree plugin provides:
+- **Isolated Development**: Separate worktrees for each issue/feature
+- **Database Snapshots**: Automatically snapshot SQLite databases (Cloudflare D1, .db files)
+- **Port Management**: Auto-assign unique ports (4322, 4323, etc.)
+- **Dev Server Control**: Optionally start dev servers automatically
+- **Package Manager Agnostic**: Works with npm, yarn, or pnpm
+
+#### Usage
+
+```bash
+# Create worktree for issue #15
+pnpm worktree create 15 dark-mode --start-server
+
+# List active worktrees
+pnpm worktree list
+
+# Show worktree info
+pnpm worktree info 15
+
+# Delete worktree when done
+pnpm worktree delete 15
+```
+
+#### Integration with Skills
+
+The `/ship` and `/done` skills automatically integrate with worktrees when the worktree script is detected in your project:
+- `/ship` creates worktrees for new issues
+- `/done` cleans up worktrees after PR merge
+- `/work` shows active worktrees in the dashboard
 
 ### Screenshots
 
