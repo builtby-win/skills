@@ -61,26 +61,42 @@ Branch naming:
 - Slug: lowercase, hyphens, max 30 chars
 - Example: `myproject/issue-15-dark-mode`
 
-### Step 6: Create Worktree (Optional - Project Specific)
+### Step 6: Create Worktree (If Available)
 
-**Note**: This step is optional and depends on your project's worktree setup.
-
-If your project uses git worktrees with project-specific tooling:
+Check if the project has worktree management installed:
 
 ```bash
-# Extract slug from branch name
-SLUG=$(echo "{PROJECT_PREFIX}/issue-{N}-{slug}" | sed 's/.*issue-[0-9]*-//')
+# Check if scripts/manage-worktree.ts exists
+if [ -f "scripts/manage-worktree.ts" ]; then
+  # Detect package manager
+  if [ -f "pnpm-lock.yaml" ]; then
+    PKG_MANAGER="pnpm"
+  elif [ -f "yarn.lock" ]; then
+    PKG_MANAGER="yarn"
+  else
+    PKG_MANAGER="npm"
+  fi
 
-# Create worktree using your project's command
-# Example: pnpm worktree create {N} ${SLUG} --start-server
-# Or manually: git worktree add .worktrees/issue-{N}-${SLUG} {PROJECT_PREFIX}/issue-{N}-{slug}
+  # Extract slug from branch name
+  SLUG=$(echo "{PROJECT_PREFIX}/issue-{N}-{slug}" | sed 's/.*issue-[0-9]*-//')
+
+  # Create worktree with dev server
+  case $PKG_MANAGER in
+    pnpm) pnpm worktree create {N} ${SLUG} --start-server ;;
+    yarn) yarn worktree create {N} ${SLUG} --start-server ;;
+    npm) npm run worktree create {N} ${SLUG} --start-server ;;
+  esac
+
+  WORKTREE_CREATED=1
+fi
 ```
 
-This may:
-- Create worktree at `.worktrees/issue-{N}-{slug}/`
-- Copy current database state
-- Assign next available port
-- Start dev server on assigned port
+If worktree was created, it will:
+- Create `.worktrees/issue-{N}-{slug}/` directory
+- Snapshot SQLite database(s) for isolated state
+- Assign next available port (e.g., 4322)
+- Start dev server automatically
+- Symlink node_modules to save disk space
 
 ### Step 7: Clean Up Plan File
 
@@ -102,13 +118,22 @@ Status: in-progress
 Ready to implement!
 ```
 
-If worktrees were created, also include:
+If worktree was created, also include:
 ```
-Worktree: .worktrees/issue-{N}-{slug}
-Dev server: {URL} (started)
+Worktree created:
+  Path: .worktrees/issue-{N}-{slug}
+  Port: {PORT}
+  Dev server: http://localhost:{PORT} (started)
+  Database: {N} snapshot(s)
 
 Navigate to worktree:
   cd .worktrees/issue-{N}-{slug}
+```
+
+If worktree was NOT created (no scripts/manage-worktree.ts), suggest installation:
+```
+💡 Tip: Install worktree management for parallel development with isolated databases.
+   Run: /setup-worktree
 ```
 
 ## For Existing Issues

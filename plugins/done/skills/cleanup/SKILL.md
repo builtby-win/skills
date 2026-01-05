@@ -33,26 +33,44 @@ gh pr view --json state,mergedAt
 
 Verify the PR was merged. If not merged, warn user.
 
-### Step 3: Delete Worktree (Optional - Project Specific)
+### Step 3: Delete Worktree (If Present)
 
-**Note**: This step is optional and depends on your project's worktree setup.
-
-If your project uses worktrees (e.g., via `pnpm worktree` or similar):
+Check if the project has worktree management and if a worktree exists for this issue:
 
 ```bash
-# Extract issue number from branch name
-ISSUE_NUM=$(git branch --show-current | grep -oP 'issue-\K[0-9]+')
+# Check if scripts/manage-worktree.ts exists
+if [ -f "scripts/manage-worktree.ts" ]; then
+  # Extract issue number from branch name
+  ISSUE_NUM=$(git branch --show-current | grep -oP 'issue-\K[0-9]+')
 
-# Delete worktree (project-specific command)
-# Example for pnpm worktree: pnpm worktree delete ${ISSUE_NUM}
-# Adapt this command to your project's worktree management
+  # Detect package manager
+  if [ -f "pnpm-lock.yaml" ]; then
+    PKG_MANAGER="pnpm"
+  elif [ -f "yarn.lock" ]; then
+    PKG_MANAGER="yarn"
+  else
+    PKG_MANAGER="npm"
+  fi
+
+  # Delete worktree if it exists
+  case $PKG_MANAGER in
+    pnpm) pnpm worktree delete ${ISSUE_NUM} 2>/dev/null ;;
+    yarn) yarn worktree delete ${ISSUE_NUM} 2>/dev/null ;;
+    npm) npm run worktree delete ${ISSUE_NUM} 2>/dev/null ;;
+  esac
+
+  # Check if deletion succeeded
+  if [ $? -eq 0 ]; then
+    WORKTREE_DELETED=1
+  fi
+fi
 ```
 
-This may:
+If worktree was deleted, it will:
 - Stop the dev server if running
-- Remove the worktree directory
-- Free up the port
-- Update metadata
+- Remove `.worktrees/issue-{N}-{slug}/` directory
+- Free up the assigned port
+- Update `.worktree-metadata.json`
 
 ### Step 4: Switch to Main
 
@@ -98,11 +116,11 @@ Cleanup complete:
 Ready for next task. Run /work to see what's available.
 ```
 
-If worktrees were used, also include:
+If worktree was deleted, also include:
 ```
 - Deleted worktree: .worktrees/issue-{N}-{slug}
-  - Stopped dev server (port XXXX now available)
-  - Removed database snapshot
+  - Stopped dev server (port {PORT} now available)
+  - Removed {N} database snapshot(s)
 ```
 
 ## Auto-Detection

@@ -1,0 +1,9 @@
+{
+  "name": "worktree",
+  "description": "Git worktree management with SQLite database snapshots and port isolation",
+  "version": "1.0.0",
+  "author": {
+    "name": "Winston Zhao"
+  },
+  "repository": "https://github.com/builtby-win/skills"
+}
