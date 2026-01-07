@@ -61,34 +61,18 @@ Branch naming:
 - Slug: lowercase, hyphens, max 30 chars
 - Example: `myproject/issue-15-dark-mode`
 
-### Step 6: Create Worktree (If Available)
+### Step 6: Create Worktree (Optional)
 
-Check if the project has worktree management installed:
+If the project uses SQLite databases or parallel development is needed, create a worktree:
 
 ```bash
-# Check if scripts/manage-worktree.ts exists
-if [ -f "scripts/manage-worktree.ts" ]; then
-  # Detect package manager
-  if [ -f "pnpm-lock.yaml" ]; then
-    PKG_MANAGER="pnpm"
-  elif [ -f "yarn.lock" ]; then
-    PKG_MANAGER="yarn"
-  else
-    PKG_MANAGER="npm"
-  fi
+# Use the global worktree CLI (npx auto-installs if needed)
+npx @anthropic/worktree create {N} {slug} --start-server --branch-prefix={PROJECT_PREFIX}
+```
 
-  # Extract slug from branch name
-  SLUG=$(echo "{PROJECT_PREFIX}/issue-{N}-{slug}" | sed 's/.*issue-[0-9]*-//')
-
-  # Create worktree with dev server
-  case $PKG_MANAGER in
-    pnpm) pnpm worktree create {N} ${SLUG} --start-server ;;
-    yarn) yarn worktree create {N} ${SLUG} --start-server ;;
-    npm) npm run worktree create {N} ${SLUG} --start-server ;;
-  esac
-
-  WORKTREE_CREATED=1
-fi
+Alternatively, if the worktree CLI is installed globally:
+```bash
+worktree create {N} {slug} --start-server --branch-prefix={PROJECT_PREFIX}
 ```
 
 If worktree was created, it will:
@@ -130,10 +114,10 @@ Navigate to worktree:
   cd .worktrees/issue-{N}-{slug}
 ```
 
-If worktree was NOT created (no scripts/manage-worktree.ts), suggest installation:
+If worktree was NOT created (user didn't request it), mention availability:
 ```
-💡 Tip: Install worktree management for parallel development with isolated databases.
-   Run: /setup-worktree
+💡 Tip: For parallel development with isolated databases, use worktrees:
+   npx @anthropic/worktree create {N} {slug} --start-server
 ```
 
 ## For Existing Issues

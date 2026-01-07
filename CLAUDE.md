@@ -202,35 +202,37 @@ Examples:
 
 ### Worktrees (Optional)
 
-For projects with SQLite databases or when you need to work on multiple features in parallel, use git worktrees:
+For projects with SQLite databases or when you need to work on multiple features in parallel, use git worktrees.
 
-#### Installation
+#### Usage
+
+The worktree CLI is available as an npm package - no project-specific setup needed:
 
 ```bash
-# Install the worktree plugin
-/plugin install worktree@builtby-win-skills
+# Use directly with npx (recommended)
+npx @anthropic/worktree create 15 dark-mode --start-server
+npx @anthropic/worktree list
+npx @anthropic/worktree info 15
+npx @anthropic/worktree delete 15
 
-# Set up your project (run once per project)
-/setup-worktree
+# Or install globally for faster access
+npm install -g @anthropic/worktree
+worktree create 15 dark-mode --start-server
 ```
-
-This installs `scripts/manage-worktree.ts` and adds the `worktree` command to your package.json.
 
 #### Configuration
 
-Add to your project's `CLAUDE.md`:
+Optional environment variables (set in `CLAUDE.md` or shell):
 
-```markdown
-## Worktree Configuration
+- `PROJECT_PREFIX` - Branch naming prefix (default: directory name)
+- `WORKTREE_BASE_PORT` - Starting port for dev servers (default: 4322)
+- `WORKTREE_MAIN_PORT` - Main worktree port (default: 4321)
+- `WORKTREE_DEV_COMMAND` - npm script to start dev server (default: "dev")
+- `WORKTREE_DB_PATH` - Custom SQLite database path
 
-- `PROJECT_PREFIX=your-project-name` - Branch naming prefix
-- `WORKTREE_BASE_PORT=4322` - Starting port for dev servers
-- `WORKTREE_MAIN_PORT=4321` - Main worktree dev server port
-- `WORKTREE_DEV_COMMAND=dev` - npm script to start dev server
+#### When to Use Worktrees
 
-### When to Use Worktrees
-
-**Use worktrees** (via `pnpm worktree create`):
+**Use worktrees** (via `npx @anthropic/worktree create`):
 - Database/schema changes requiring isolated state
 - Backend API changes needing separate dev server
 - Parallel development on multiple features
@@ -240,37 +242,19 @@ Add to your project's `CLAUDE.md`:
 - UI-only changes (styling, components)
 - Documentation updates
 - Simple fixes with no database interaction
-```
 
 #### Features
 
-The worktree plugin provides:
 - **Isolated Development**: Separate worktrees for each issue/feature
 - **Database Snapshots**: Automatically snapshot SQLite databases (Cloudflare D1, .db files)
 - **Port Management**: Auto-assign unique ports (4322, 4323, etc.)
 - **Dev Server Control**: Optionally start dev servers automatically
 - **Package Manager Agnostic**: Works with npm, yarn, or pnpm
 
-#### Usage
-
-```bash
-# Create worktree for issue #15
-pnpm worktree create 15 dark-mode --start-server
-
-# List active worktrees
-pnpm worktree list
-
-# Show worktree info
-pnpm worktree info 15
-
-# Delete worktree when done
-pnpm worktree delete 15
-```
-
 #### Integration with Skills
 
-The `/ship` and `/done` skills automatically integrate with worktrees when the worktree script is detected in your project:
-- `/ship` creates worktrees for new issues
+The `/ship` and `/done` skills can use worktrees:
+- `/ship` can create worktrees for new issues
 - `/done` cleans up worktrees after PR merge
 - `/work` shows active worktrees in the dashboard
 

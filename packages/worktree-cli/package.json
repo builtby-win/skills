@@ -1,0 +1,41 @@
+{
+  "name": "@anthropic/worktree",
+  "version": "0.1.0",
+  "description": "Git worktree management with SQLite database snapshots for parallel development",
+  "keywords": [
+    "git",
+    "worktree",
+    "sqlite",
+    "database",
+    "snapshot",
+    "development",
+    "parallel"
+  ],
+  "author": "builtby-win",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/builtby-win/skills"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "worktree": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
