@@ -43,7 +43,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oP 'issue-\K[0-9]+')
 
 # Try to delete worktree using the global CLI
 # This will fail gracefully if no worktree exists
-npx @anthropic/worktree delete ${ISSUE_NUM} 2>/dev/null && WORKTREE_DELETED=1
+npx @builtby.win/worktree delete ${ISSUE_NUM} 2>/dev/null && WORKTREE_DELETED=1
 ```
 
 Alternatively with globally installed CLI:

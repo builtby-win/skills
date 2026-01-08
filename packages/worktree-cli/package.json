@@ -1,16 +1,8 @@
 {
-  "name": "@anthropic/worktree",
-  "version": "0.1.0",
+  "name": "@builtby.win/worktree",
+  "version": "0.1.4",
   "description": "Git worktree management with SQLite database snapshots for parallel development",
-  "keywords": [
-    "git",
-    "worktree",
-    "sqlite",
-    "database",
-    "snapshot",
-    "development",
-    "parallel"
-  ],
+  "keywords": ["git", "worktree", "sqlite", "database", "snapshot", "development", "parallel"],
   "author": "builtby-win",
   "license": "MIT",
   "repository": {
@@ -23,19 +15,25 @@
   "bin": {
     "worktree": "./dist/cli.js"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/cli.js",
     "dev": "tsc --watch",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check --write .",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@builtby.win/configs": "^1.0.1",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

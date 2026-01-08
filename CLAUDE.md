@@ -210,13 +210,13 @@ The worktree CLI is available as an npm package - no project-specific setup need
 
 ```bash
 # Use directly with npx (recommended)
-npx @anthropic/worktree create 15 dark-mode --start-server
-npx @anthropic/worktree list
-npx @anthropic/worktree info 15
-npx @anthropic/worktree delete 15
+npx @builtby.win/worktree create 15 dark-mode --start-server
+npx @builtby.win/worktree list
+npx @builtby.win/worktree info 15
+npx @builtby.win/worktree delete 15
 
 # Or install globally for faster access
-npm install -g @anthropic/worktree
+npm install -g @builtby.win/worktree
 worktree create 15 dark-mode --start-server
 ```
 
@@ -232,7 +232,7 @@ Optional environment variables (set in `CLAUDE.md` or shell):
 
 #### When to Use Worktrees
 
-**Use worktrees** (via `npx @anthropic/worktree create`):
+**Use worktrees** (via `npx @builtby.win/worktree create`):
 - Database/schema changes requiring isolated state
 - Backend API changes needing separate dev server
 - Parallel development on multiple features

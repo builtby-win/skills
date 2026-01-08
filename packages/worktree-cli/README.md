@@ -1,15 +1,17 @@
-# @anthropic/worktree
+# @builtby.win/worktree
 
 Git worktree management with SQLite database snapshots for parallel development.
+
+[![npm version](https://img.shields.io/npm/v/@builtby.win/worktree.svg)](https://www.npmjs.com/package/@builtby.win/worktree)
 
 ## Installation
 
 ```bash
 # Global install
-npm install -g @anthropic/worktree
+npm install -g @builtby.win/worktree
 
 # Or use npx (no install needed)
-npx @anthropic/worktree create 15 dark-mode
+npx @builtby.win/worktree create 15 dark-mode
 ```
 
 ## Usage

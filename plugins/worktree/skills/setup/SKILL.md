@@ -12,12 +12,12 @@ description: "[DEPRECATED] Worktree CLI is now available via npm - no setup need
 
 ```bash
 # Use directly with npx (no install needed)
-npx @anthropic/worktree create 15 dark-mode --start-server
-npx @anthropic/worktree list
-npx @anthropic/worktree delete 15
+npx @builtby.win/worktree create 15 dark-mode --start-server
+npx @builtby.win/worktree list
+npx @builtby.win/worktree delete 15
 
 # Or install globally for faster access
-npm install -g @anthropic/worktree
+npm install -g @builtby.win/worktree
 worktree create 15 dark-mode --start-server
 ```
 
@@ -41,7 +41,7 @@ The old approach required:
 4. Adding a package.json script entry
 
 The new approach:
-1. Just works with `npx @anthropic/worktree`
+1. Just works with `npx @builtby.win/worktree`
 2. No project-specific setup
 3. Works across all your projects
 4. Stays up-to-date automatically
@@ -57,4 +57,4 @@ The new approach:
 ## See Also
 
 - [Worktree Plugin README](../../README.md)
-- npm package: `@anthropic/worktree`
+- npm package: `@builtby.win/worktree`

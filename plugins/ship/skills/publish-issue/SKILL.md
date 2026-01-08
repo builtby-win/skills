@@ -67,7 +67,7 @@ If the project uses SQLite databases or parallel development is needed, create a
 
 ```bash
 # Use the global worktree CLI (npx auto-installs if needed)
-npx @anthropic/worktree create {N} {slug} --start-server --branch-prefix={PROJECT_PREFIX}
+npx @builtby.win/worktree create {N} {slug} --start-server --branch-prefix={PROJECT_PREFIX}
 ```
 
 Alternatively, if the worktree CLI is installed globally:
@@ -117,7 +117,7 @@ Navigate to worktree:
 If worktree was NOT created (user didn't request it), mention availability:
 ```
 💡 Tip: For parallel development with isolated databases, use worktrees:
-   npx @anthropic/worktree create {N} {slug} --start-server
+   npx @builtby.win/worktree create {N} {slug} --start-server
 ```
 
 ## For Existing Issues

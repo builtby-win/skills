@@ -17,10 +17,10 @@ The worktree CLI is available as an npm package - no project-specific setup need
 
 ```bash
 # Use directly with npx (recommended)
-npx @anthropic/worktree create 15 dark-mode --start-server
+npx @builtby.win/worktree create 15 dark-mode --start-server
 
 # Or install globally
-npm install -g @anthropic/worktree
+npm install -g @builtby.win/worktree
 worktree create 15 dark-mode --start-server
 ```
 
@@ -28,16 +28,16 @@ worktree create 15 dark-mode --start-server
 
 ```bash
 # Create a worktree for issue #15
-npx @anthropic/worktree create 15 dark-mode --start-server
+npx @builtby.win/worktree create 15 dark-mode --start-server
 
 # List active worktrees
-npx @anthropic/worktree list
+npx @builtby.win/worktree list
 
 # Show worktree details
-npx @anthropic/worktree info 15
+npx @builtby.win/worktree info 15
 
 # Delete worktree when done
-npx @anthropic/worktree delete 15
+npx @builtby.win/worktree delete 15
 ```
 
 ## Integration with Claude Skills
@@ -60,16 +60,16 @@ The CLI automatically finds SQLite databases in:
 
 ```bash
 # Create worktree
-npx @anthropic/worktree create <issue-number> <slug> [--start-server] [--branch-prefix=prefix]
+npx @builtby.win/worktree create <issue-number> <slug> [--start-server] [--branch-prefix=prefix]
 
 # List worktrees
-npx @anthropic/worktree list
+npx @builtby.win/worktree list
 
 # Show worktree info
-npx @anthropic/worktree info <issue-number>
+npx @builtby.win/worktree info <issue-number>
 
 # Delete worktree
-npx @anthropic/worktree delete <issue-number> [--force]
+npx @builtby.win/worktree delete <issue-number> [--force]
 ```
 
 ## Configuration
@@ -99,7 +99,7 @@ Optional environment variables (set in `CLAUDE.md` or `.env`):
 
 ```bash
 # Claude creates issue #20 for email notifications feature
-$ npx @anthropic/worktree create 20 email-notifications --start-server
+$ npx @builtby.win/worktree create 20 email-notifications --start-server
 
 Creating worktree for issue #20...
   Project root: /home/user/myproject
@@ -121,7 +121,7 @@ $ git commit -am "Add email notification service"
 
 # When done, clean up
 $ cd ../..
-$ npx @anthropic/worktree delete 20
+$ npx @builtby.win/worktree delete 20
 ```
 
 ## Metadata
@@ -163,7 +163,7 @@ The CLI auto-detects your package manager when starting dev servers:
 
 **Port already in use?**
 - CLI auto-detects and skips to next available port
-- Check with: `npx @anthropic/worktree list`
+- Check with: `npx @builtby.win/worktree list`
 
 ## Migration from Local Script
 
@@ -177,7 +177,7 @@ rm scripts/manage-worktree.ts
 # Edit package.json to remove "worktree" script
 
 # Use npx instead
-npx @anthropic/worktree list
+npx @builtby.win/worktree list
 ```
 
 The npm CLI is fully compatible with existing `.worktree-metadata.json` files.

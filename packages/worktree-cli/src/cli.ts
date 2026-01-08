@@ -4,10 +4,10 @@
  * Worktree CLI - Git worktree management with SQLite database snapshots
  *
  * Usage:
- *   npx @anthropic/worktree create <issue-number> <slug> [options]
- *   npx @anthropic/worktree delete <issue-number> [--force]
- *   npx @anthropic/worktree list
- *   npx @anthropic/worktree info <issue-number>
+ *   npx @builtby.win/worktree create <issue-number> <slug> [options]
+ *   npx @builtby.win/worktree delete <issue-number> [--force]
+ *   npx @builtby.win/worktree list
+ *   npx @builtby.win/worktree info <issue-number>
  */
 
 import { createWorktree, deleteWorktree, listWorktrees, showWorktreeInfo } from './index.js'
@@ -107,7 +107,8 @@ async function main(): Promise<void> {
 
         await createWorktree(issueNumber, slug, {
           startServer: Boolean(flags['start-server']),
-          branchPrefix: typeof flags['branch-prefix'] === 'string' ? flags['branch-prefix'] : undefined,
+          branchPrefix:
+            typeof flags['branch-prefix'] === 'string' ? flags['branch-prefix'] : undefined,
           port: typeof flags['port'] === 'string' ? parseInt(flags['port']) : undefined,
         })
         break

@@ -91,7 +91,10 @@ function saveMetadata(rootDir: string, metadata: WorktreeMetadata): void {
 
 async function isPortInUse(port: number): Promise<boolean> {
   try {
-    const result = execSync(`lsof -i :${port}`, { encoding: 'utf-8', stdio: 'pipe' })
+    const result = execSync(`lsof -i :${port}`, {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    })
     return result.trim().length > 0
   } catch {
     return false
@@ -159,7 +162,11 @@ async function verifyDatabaseSnapshot(dbPath: string): Promise<boolean> {
   }
 }
 
-async function snapshotDatabase(rootDir: string, worktreePath: string, sourcePath: string): Promise<string> {
+async function snapshotDatabase(
+  rootDir: string,
+  worktreePath: string,
+  sourcePath: string,
+): Promise<string> {
   const isDirectory = fs.statSync(sourcePath).isDirectory()
 
   if (isDirectory) {
@@ -233,7 +240,11 @@ function detectPackageManager(rootDir: string): 'pnpm' | 'yarn' | 'npm' {
   return 'npm'
 }
 
-async function startDevServer(rootDir: string, worktreePath: string, port: number): Promise<number> {
+async function startDevServer(
+  rootDir: string,
+  worktreePath: string,
+  port: number,
+): Promise<number> {
   const { devCommand } = getConfig()
   console.log(`  Starting dev server on port ${port}...`)
 
@@ -369,7 +380,9 @@ export async function createWorktree(
     } catch (error) {
       console.warn(`  ⚠ Failed to start dev server: ${error}`)
       const pm = detectPackageManager(rootDir)
-      console.warn(`  Start manually: cd ${WORKTREE_DIR}/${worktreeName} && ${pm} ${getConfig().devCommand} --port ${port}`)
+      console.warn(
+        `  Start manually: cd ${WORKTREE_DIR}/${worktreeName} && ${pm} ${getConfig().devCommand} --port ${port}`,
+      )
     }
   }
 
@@ -523,10 +536,11 @@ export async function showWorktreeInfo(issueNumber: number): Promise<WorktreeInf
   } else {
     const pm = detectPackageManager(rootDir)
     console.log(`  Dev Server: not running`)
-    console.log(`\n  Start with: cd ${worktree.path} && ${pm} ${getConfig().devCommand} --port ${worktree.port}`)
+    console.log(
+      `\n  Start with: cd ${worktree.path} && ${pm} ${getConfig().devCommand} --port ${worktree.port}`,
+    )
   }
 
   console.log('')
   return worktree
 }
-
