@@ -11,55 +11,46 @@ Git worktree management with SQLite database snapshots and port isolation for pa
 - **Generic SQLite Support**: Works with Cloudflare D1, local .db files, and any SQLite database
 - **Package Manager Agnostic**: Works with npm, yarn, or pnpm
 
-## Quick Start
+## Installation
 
-### 1. Install in Your Project
-
-Run the setup skill (Claude does this automatically when needed):
+The worktree CLI is available as an npm package - no project-specific setup needed!
 
 ```bash
-# Claude will run this when you first use worktrees
-# Or invoke manually with: /setup-worktree
+# Use directly with npx (recommended)
+npx @builtby.win/worktree create 15 dark-mode --start-server
+
+# Or install globally
+npm install -g @builtby.win/worktree
+worktree create 15 dark-mode --start-server
 ```
 
-This installs `scripts/manage-worktree.ts` and adds the `worktree` command.
-
-### 2. Use Worktrees
+## Usage
 
 ```bash
-# Works with any package manager
-npm run worktree create 15 dark-mode --start-server
-yarn worktree create 15 dark-mode --start-server
-pnpm worktree create 15 dark-mode --start-server
+# Create a worktree for issue #15
+npx @builtby.win/worktree create 15 dark-mode --start-server
 
 # List active worktrees
-pnpm worktree list
+npx @builtby.win/worktree list
+
+# Show worktree details
+npx @builtby.win/worktree info 15
 
 # Delete worktree when done
-pnpm worktree delete 15
+npx @builtby.win/worktree delete 15
 ```
 
 ## Integration with Claude Skills
 
 This plugin integrates seamlessly with your workflow:
 
-- **`/ship`** - Automatically creates worktrees when starting new issues (if project has worktree script)
+- **`/ship`** - Optionally creates worktrees when starting new issues
 - **`/done`** - Automatically cleans up worktrees when issues are completed
-
-## What Gets Installed
-
-When you run the setup skill, it:
-
-1. Copies `scripts/manage-worktree.ts` to your project
-2. Adds `"worktree": "tsx scripts/manage-worktree.ts"` to package.json
-3. Installs `tsx` if not already present (detects npm/yarn/pnpm automatically)
-4. Updates `.gitignore` with `.worktrees/` and `.worktree-metadata.json`
-5. Detects SQLite databases in your project
-6. Optionally adds configuration to `CLAUDE.md`
+- **`/work`** - Shows active worktrees in dashboard
 
 ## Database Detection
 
-The script automatically finds SQLite databases in:
+The CLI automatically finds SQLite databases in:
 
 - **Cloudflare D1**: `.wrangler/state/v3/d1/*/`
 - **Root directory**: `*.db`, `*.sqlite`, `*.sqlite3`
@@ -69,16 +60,16 @@ The script automatically finds SQLite databases in:
 
 ```bash
 # Create worktree
-{npm|yarn|pnpm} worktree create <issue-number> <slug> [--start-server] [--branch-prefix=prefix]
+npx @builtby.win/worktree create <issue-number> <slug> [--start-server] [--branch-prefix=prefix]
 
 # List worktrees
-{npm|yarn|pnpm} worktree list
+npx @builtby.win/worktree list
 
 # Show worktree info
-{npm|yarn|pnpm} worktree info <issue-number>
+npx @builtby.win/worktree info <issue-number>
 
 # Delete worktree
-{npm|yarn|pnpm} worktree delete <issue-number> [--force]
+npx @builtby.win/worktree delete <issue-number> [--force]
 ```
 
 ## Configuration
@@ -108,9 +99,11 @@ Optional environment variables (set in `CLAUDE.md` or `.env`):
 
 ```bash
 # Claude creates issue #20 for email notifications feature
-$ pnpm worktree create 20 email-notifications --start-server
+$ npx @builtby.win/worktree create 20 email-notifications --start-server
 
 Creating worktree for issue #20...
+  Project root: /home/user/myproject
+
   ✓ Git worktree created
   ✓ node_modules symlinked
   ✓ Database snapshot: .wrangler/state/v3/d1/... (1 file)
@@ -128,7 +121,7 @@ $ git commit -am "Add email notification service"
 
 # When done, clean up
 $ cd ../..
-$ pnpm worktree delete 20
+$ npx @builtby.win/worktree delete 20
 ```
 
 ## Metadata
@@ -156,13 +149,11 @@ This file is git-ignored and tracks local worktree state.
 
 ## Package Manager Detection
 
-The script auto-detects your package manager:
+The CLI auto-detects your package manager when starting dev servers:
 
 - **pnpm**: If `pnpm-lock.yaml` exists
 - **yarn**: If `yarn.lock` exists
 - **npm**: Default fallback
-
-Dev servers are started with the detected package manager.
 
 ## Troubleshooting
 
@@ -171,12 +162,22 @@ Dev servers are started with the detected package manager.
 - Set `WORKTREE_DB_PATH` if database is in non-standard location
 
 **Port already in use?**
-- Script auto-detects and skips to next available port
-- Check with: `{npm|yarn|pnpm} worktree list`
+- CLI auto-detects and skips to next available port
+- Check with: `npx @builtby.win/worktree list`
 
-**tsx not found?**
-- Setup skill installs it automatically
-- Or install manually with your package manager:
-  - `pnpm add -D tsx`
-  - `npm install -D tsx`
-  - `yarn add -D tsx`
+## Migration from Local Script
+
+If you previously used `/setup-worktree` to install a local script, you can remove it:
+
+```bash
+# Remove local script (optional, won't conflict)
+rm scripts/manage-worktree.ts
+
+# Remove package.json script entry (optional)
+# Edit package.json to remove "worktree" script
+
+# Use npx instead
+npx @builtby.win/worktree list
+```
+
+The npm CLI is fully compatible with existing `.worktree-metadata.json` files.
