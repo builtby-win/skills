@@ -24,7 +24,12 @@ Display the GitHub Issues dashboard showing current work status, open PRs, and a
 ## Usage
 
 ```bash
-/work
+/work           # Current project dashboard (GitHub Issues)
+/work mine      # Only your issues
+/work prs       # Only open PRs
+/work next      # Next suggested task
+/work global    # All beads tasks across all projects
+/work global <project>  # Global view filtered to one project
 ```
 
 The command will display:
@@ -32,3 +37,17 @@ The command will display:
 - Open PRs and their review status
 - Backlog items ready to start
 - Suggested next task based on priority/age
+
+## Global Variant
+
+Use `/work global` to see tasks from ALL beads repositories on your system:
+
+```bash
+/work global           # All projects
+/work global homebase  # Filter to homebase project only
+```
+
+This scans your home directory for `.beads/` folders and aggregates tasks, showing:
+- Projects with open task counts
+- Ready tasks (unblocked, sorted by priority)
+- Quick actions for task management
