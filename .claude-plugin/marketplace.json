@@ -5,31 +5,13 @@
     "email": "winstonzhao@ucla.edu"
   },
   "metadata": {
-    "description": "GitHub workflow automation skills for issue management, branching, PRs, and team coordination"
+    "description": "Tmux orchestration, task capture, and writing utilities with optional Claude plugin wrappers"
   },
   "plugins": [
     {
-      "name": "done",
-      "source": "./plugins/done",
-      "description": "Clean up after a PR is merged - delete branches and confirm issue closure",
-      "version": "1.0.0"
-    },
-    {
-      "name": "pr",
-      "source": "./plugins/pr",
-      "description": "Create a Pull Request for the current issue branch",
-      "version": "1.0.0"
-    },
-    {
-      "name": "ship",
-      "source": "./plugins/ship",
-      "description": "Publish a plan as a GitHub Issue and create a branch to start implementation",
-      "version": "1.0.0"
-    },
-    {
-      "name": "work",
-      "source": "./plugins/work",
-      "description": "Show GitHub Issues dashboard - what everyone is working on, open PRs, and backlog",
+      "name": "todo",
+      "source": "./plugins/todo",
+      "description": "Add tasks to beads repositories with smart project inference",
       "version": "1.0.0"
     },
     {
@@ -45,9 +27,9 @@
       "version": "1.0.0"
     },
     {
-      "name": "worktree",
-      "source": "./plugins/worktree",
-      "description": "Set up git worktrees with SQLite database snapshots for parallel development",
+      "name": "god-mode",
+      "source": "./plugins/god-mode",
+      "description": "Use when substantial implementation work should be coordinated through tmux panes and the agent needs to launch or reuse specialist CLI agents after the first planning pass",
       "version": "1.0.0"
     }
   ]

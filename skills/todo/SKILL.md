@@ -1,7 +1,9 @@
 ---
-name: add-task
+name: todo
 description: Add tasks to beads repositories with smart project inference
+license: See LICENSE.txt
 ---
+
 
 # Add Task to Beads
 

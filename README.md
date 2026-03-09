@@ -1,252 +1,139 @@
-# GitHub Workflow Skills
+# builtby.win Skills
 
-Claude Code plugin marketplace providing automated GitHub workflow skills for issue management, branch creation, pull requests, and team coordination.
-
-## Features
-
-### Core Workflow Skills
-
-- **`/done`** - Clean up after PR merge (delete branches, verify issue closure)
-- **`/pr`** - Create pull requests with pre-flight checks and optional screenshots
-- **`/ship`** - Publish plans as GitHub issues and create feature branches
-- **`/work`** - Display team dashboard (issues, PRs, backlog)
-
-### Optional Plugins
-
-- **`worktree`** - Git worktree management with SQLite database snapshots and port isolation for parallel development
+Custom agent skills from builtby.win, with Playbooks-first standalone installs
+and optional Claude plugin wrappers.
 
 ## Installation
 
-### Add the Marketplace
+### Recommended: Playbooks
+
+Install standalone skills directly from this repo with `playbooks`:
+
+```bash
+npx playbooks add skill builtby-win/skills --skill god-mode
+npx playbooks add skill builtby-win/skills --skill todo
+npx playbooks add skill builtby-win/skills --skill note
+npx playbooks add skill builtby-win/skills --skill blog
+```
+
+Playbooks installs the skill into your agent's skills directory. For Claude
+Code, that is typically `.claude/skills/` inside a project or your global
+Claude skills directory.
+
+### Optional: Claude Plugin Marketplace
+
+If you prefer the Claude plugin workflow, this repo still supports it:
 
 ```bash
 /plugin marketplace add builtby-win/skills
+/plugin install god-mode@builtby-win-skills
+/plugin install todo@builtby-win-skills
+/plugin install note@builtby-win-skills
+/plugin install blog@builtby-win-skills
 ```
 
-### Install Plugins
+## God Mode Setup
 
-Install core workflow skills:
+`god-mode` is a tmux-based orchestration skill. Before first use:
+
+1. Install `god-mode` from this repo.
+2. Install the separate `tmux-cli` utility or skill in your agent environment.
+3. Make sure `tmux` and whichever specialist CLIs you want are on `PATH`.
+4. Verify what is available:
 
 ```bash
-/plugin install done@builtby-win-skills
-/plugin install pr@builtby-win-skills
-/plugin install ship@builtby-win-skills
-/plugin install work@builtby-win-skills
+command -v tmux tmux-cli claude opencode codex gemini
 ```
 
-Optionally install the worktree plugin for parallel development:
+`god-mode` should detect which specialist CLIs are available, report what is
+missing, and adapt its planner, designer, and implementer routing accordingly.
+
+## Repo Layout
+
+```text
+skills/     # Standalone source-of-truth skills for Playbooks
+plugins/    # Optional Claude plugin wrappers
+packages/   # Related npm packages, including the worktree CLI
+docs/       # Plans and supporting repo documentation
+```
+
+## Current Skills
+
+### Standalone skills
+
+- `god-mode` - tmux-based multi-agent conductor workflow
+- `todo` - add tasks to Beads repositories with project inference
+- `note` - create draft blog posts from project learnings
+- `blog` - manage and publish blog drafts
+
+### Claude plugin skills
+
+- `god-mode` - tmux-based multi-agent conductor workflow
+- `todo` - add tasks to Beads repositories with project inference
+- `note` - create draft blog posts from project learnings
+- `blog` - manage and publish blog drafts
+
+## Playbooks Hosting Flow
+
+Use this repo structure when you want a skill to be discoverable on
+`playbooks.com`:
+
+1. Add the skill under `skills/<skill-name>/SKILL.md`
+2. Include optional supporting files like `LICENSE.txt`, `evals/`, `assets/`,
+   `references/`, or `scripts/`
+3. Push the repo to GitHub so Playbooks can read the skill directory
+4. Sign in to `playbooks.com` with GitHub
+5. Submit the skill or bundle through the Playbooks website
+6. Use the generated install command from the listing, for example:
 
 ```bash
-/plugin install worktree@builtby-win-skills
+npx playbooks add skill builtby-win/skills --skill god-mode
 ```
 
-## Configuration
+## Claude Plugins vs Standalone Skills
 
-After installation, configure your project by adding to `CLAUDE.md`:
+Standalone skills in `skills/` are the source of truth. `plugins/` remains an
+optional compatibility layer for Claude plugin installs.
 
-```markdown
-## GitHub Workflow Configuration
-PROJECT_PREFIX=your-project-name
+For example:
+- `skills/god-mode/` is the Playbooks-first distribution target
+- `plugins/god-mode/` is the compatibility wrapper for Claude plugin installs
 
-## Team Members
-- @your-username
-- @teammate1
-- @teammate2
-```
+## Included Standalone Skills
 
-### Configuration Options
+Current standalone skill directories:
+- `skills/god-mode/`
+- `skills/todo/`
+- `skills/note/`
+- `skills/blog/`
 
-- **`PROJECT_PREFIX`** - Branch naming prefix (e.g., `myapp`, `builtby-win-web`)
-  - Branches will be named: `{PROJECT_PREFIX}/issue-{N}-{slug}`
-  - Example: `myapp/issue-42-fix-login`
+`god-mode` also carries eval prompts in `skills/god-mode/evals/evals.json`.
 
-- **Team Members** - List of GitHub usernames for dashboard queries
+## Worktree CLI
 
-## Usage
-
-### `/ship` - Start New Work
-
-After planning a feature or fix:
+This repo also publishes the standalone worktree npm package:
 
 ```bash
-/ship
+npx @builtby.win/worktree create 15 dark-mode --start-server
 ```
 
-This will:
-1. Create a GitHub Issue with your plan
-2. Create a feature branch: `{PROJECT_PREFIX}/issue-{N}-{slug}`
-3. Mark the issue as `status:in-progress`
-4. Prepare your workspace for implementation
+`@builtby.win/worktree` is a package, not a repo-owned skill. Use it directly
+or from your own orchestration workflow after you decide isolated worktrees are
+helpful.
 
-### `/work` - View Dashboard
-
-Check what's being worked on:
-
-```bash
-/work
-```
-
-Shows:
-- In-progress issues by assignee
-- Open pull requests with review status
-- Backlog items (unassigned issues)
-- Suggested next task
-
-### `/pr` - Create Pull Request
-
-When implementation is complete:
-
-```bash
-/pr
-```
-
-This will:
-1. Run pre-flight checks (typecheck, lint)
-2. Optionally capture a screenshot
-3. Push commits to remote
-4. Create PR with "Closes #N" reference
-5. Update issue to `status:pr-ready`
-
-### `/done` - Clean Up After Merge
-
-After your PR is merged:
-
-```bash
-/done
-```
-
-This will:
-1. Delete local and remote branches
-2. Switch to main and pull latest
-3. Verify the issue is closed
-4. Clean up worktrees (if configured)
-
-## Requirements
-
-- **Claude Code** v1.0.33 or later
-- **GitHub CLI** (`gh`) - [Installation guide](https://cli.github.com/)
-- **Git** - For branch management
-
-## Workflow Example
-
-```bash
-# 1. View what needs work
-/work
-
-# 2. Start on issue #42
-# (Plan the implementation first)
-/ship
-
-# 3. Implement the feature
-# (Write code, test, commit)
-
-# 4. Create pull request
-/pr
-
-# 5. After PR is reviewed and merged
-/done
-```
-
-## Labels
-
-This workflow uses GitHub labels to track issue status:
-
-- `status:in-progress` - Currently being worked on
-- `status:pr-ready` - PR created, awaiting review
-- `status:in-review` - Under code review
-
-Create these labels in your repository:
-
-```bash
-gh label create "status:in-progress" --color "0E8A16" --description "Currently being worked on"
-gh label create "status:pr-ready" --color "FBCA04" --description "PR created, awaiting review"
-gh label create "status:in-review" --color "D93F0B" --description "Under code review"
-```
-
-## Advanced: Project-Specific Features
-
-### Worktrees
-
-For projects with SQLite databases or when you need parallel development, use the worktree plugin:
-
-#### Quick Setup
-
-```bash
-# Install the plugin
-/plugin install worktree@builtby-win-skills
-
-# Set up your project (run once)
-/setup-worktree
-```
-
-#### Features
-
-- **Isolated Development**: Separate git worktrees for each issue/feature
-- **Database Snapshots**: Automatically snapshot SQLite databases for each worktree
-  - Supports Cloudflare D1 (`.wrangler/state/v3/d1/`)
-  - Supports local `.db`, `.sqlite`, `.sqlite3` files
-  - Custom paths via `WORKTREE_DB_PATH` environment variable
-- **Port Management**: Auto-assign unique ports to avoid conflicts (4322, 4323, etc.)
-- **Dev Server Control**: Optionally start dev servers automatically
-- **Package Manager Agnostic**: Works with npm, yarn, or pnpm
-
-#### Usage
-
-```bash
-# Create worktree for issue #15 with dev server
-pnpm worktree create 15 dark-mode --start-server
-
-# List active worktrees
-pnpm worktree list
-
-# Show worktree details
-pnpm worktree info 15
-
-# Delete worktree when done
-pnpm worktree delete 15
-```
-
-#### Integration with Skills
-
-When the worktree script is detected, the skills automatically integrate:
-- **`/ship`** - Creates worktrees for new issues (if project has SQLite databases)
-- **`/done`** - Cleans up worktrees after PR merge
-- **`/work`** - Shows active worktrees in the dashboard
-
-#### When to Use Worktrees
-
-**Use worktrees for:**
-- Database/schema changes requiring isolated state
-- Backend API changes needing separate dev server
-- Parallel work on multiple features
-- Testing migrations before merging
-
-**Use regular branches for:**
-- UI-only changes (styling, components)
-- Documentation updates
-- Simple fixes with no database interaction
-
-See the [worktree plugin README](plugins/worktree/README.md) for full documentation.
-
-### Screenshots
-
-The `/pr` skill supports capturing screenshots of UI changes:
-- Requires Chrome DevTools MCP integration
-- Project must have session authentication
-- Screenshots are saved to `.github/pr-screenshots/`
+Package source:
+- `packages/worktree-cli/package.json`
 
 ## Contributing
 
-Found a bug or have a feature request? [Open an issue](https://github.com/builtby-win/skills/issues)
+To add another Playbooks-ready skill:
+
+1. Create `skills/<skill-name>/SKILL.md`
+2. Add support files if needed
+3. Optionally add a Claude plugin wrapper under `plugins/<skill-name>/`
+4. Update this README and `.claude-plugin/marketplace.json` if you publish the
+   plugin wrapper
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details
-
-## Author
-
-**Winston Zhao** ([`@snoolord`](https://github.com/snoolord))
-
----
-
-Made with [Claude Code](https://claude.com/claude-code)
+MIT - see `LICENSE`

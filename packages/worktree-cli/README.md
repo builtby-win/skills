@@ -114,13 +114,14 @@ $ cd ../..
 $ worktree delete 20
 ```
 
-## Integration with Claude Skills
+## Integration
 
-This CLI is designed to work with the builtby-win/skills workflow:
+This CLI is standalone. Use it directly from any git repo once you decide
+isolated worktrees are helpful.
 
-- `/ship` - Creates worktrees when starting new issues
-- `/done` - Cleans up worktrees after PR merge
-- `/work` - Shows active worktrees in dashboard
+It also pairs well with tmux-based orchestration flows such as `god-mode`, or
+with your own superpowers-driven workflow, but it does not depend on any
+repo-owned workflow command.
 
 ## License
 

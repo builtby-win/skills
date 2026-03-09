@@ -1,0 +1,29 @@
+{
+  "skill_name": "god-mode",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I'm starting a new invite-only onboarding flow for our app. It needs clean business logic around invite states, a polished mobile-first UI, and exact implementation changes in the repo. You are the only agent currently running; start whatever other agent CLIs you need and handle this in the best way using the tools available.",
+      "expected_output": "The agent does the first planning pass itself, uses brainstorming to split the work into small parallel slices, launches specialist CLIs in tmux as needed, and routes results back through conductor check-ins before the next round.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "We need a billing settings redesign. I care about strong UX, clear plan-change and trial logic, and clean implementation without a lot of thrashing. Please take this from idea to execution. If the specialist panes are not already running, launch them.",
+      "expected_output": "The agent recognizes cross-functional scope, uses brainstorming to identify small independent streams, launches or reuses the needed specialist CLIs, runs tmux-based delegation in parallel, and keeps ownership boundaries clear with conductor-led check-ins between rounds.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Build a notifications preferences revamp with backend preference rules, cleaner responsive UI, and exact repo implementation. Move quickly and use the best agent workflow you have. Start by making the initial plan yourself, then spin up any other agents you need.",
+      "expected_output": "The agent defaults to role-based orchestration, makes the initial plan in the conductor pane, launches small independent streams early, and continues parallelizing implementation rounds with explicit conductor evaluation after each batch.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Please tighten the spacing in the settings header and rename the primary button from 'Continue' to 'Save changes'.",
+      "expected_output": "The agent decides this task is too small for orchestration and stays single-threaded while saying why.",
+      "files": []
+    }
+  ]
+}
