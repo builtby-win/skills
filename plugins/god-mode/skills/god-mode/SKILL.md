@@ -10,23 +10,30 @@ description: Use when substantial implementation work should be coordinated thro
 Run substantial implementation work through a conductor agent that coordinates
 specialist agents in tmux panes.
 
-The conductor does not try to be the best planner, designer, and implementer at
-once. It uses the strongest available agents for each role, runs as much work in
-parallel as the task safely allows, and then integrates the results into one
-coherent direction.
+The conductor does not try to do all planning, design, investigation,
+implementation, and review alone. It uses the strongest available agents for
+each role, runs as much work in parallel as the task safely allows, and then
+integrates the results into one coherent direction.
 
-The agent that starts `god-mode` is usually the conductor and should usually do
-the first planning pass itself before spinning up specialists. Do not outsource
-initial decomposition too early.
+The agent that starts `god-mode` is the conductor. It owns the first planning
+pass before spinning up specialists. Do not outsource initial decomposition too
+early.
 
 Treat the system as role-based first and vendor-based second:
-- `planner`: strongest at decomposition, logic, sequencing, and risk review
-- `designer`: strongest at UX, visual quality, interaction critique, and polish
-- `implementer`: strongest at exact file changes and tightly scoped execution
+- `conductor` (local): planning, decomposition, and synthesis
+- `investigator`: exploration, repo investigation, and second-opinion analysis
+- `designer`: UI, visual quality, and interaction critique
+- `implementer`: exact file changes and tightly scoped execution
+- `reviewer`: pure code-quality review on stable slices
 
-Typical defaults may be Claude for `planner`, Gemini for `designer`, and
-Codex/OpenCode for `implementer`, but follow the actual pane map the user has
-configured.
+Default routing tendencies when those CLIs are available:
+- this session: conductor and first planning pass
+- Claude: planning follow-up, exploration, and general investigation
+- Gemini: UI design and critique
+- Codex: implementation and pure code-quality review
+
+These are defaults, not hard rules. If the user has a preferred role map,
+follow it.
 
 ## When To Use
 
@@ -91,18 +98,85 @@ Interpret the result like this:
 Do not ask the user to infer the setup state. Show detected tools and what is
 missing.
 
+Then do a short setup handshake.
+
+Preferred startup shape:
+
+```text
+God mode setup
+- Detected: claude, codex, gemini
+- Missing: opencode
+- Conductor: this session
+
+Recommended role map
+- conductor/first planning pass: this session
+- investigator: claude
+- implementer: codex
+- reviewer: codex
+- designer: gemini
+```
+
+If the user has not already specified a role map, ask one focused follow-up:
+- "Keep this map, or change any role assignments?"
+
+If the user already gave a mapping, skip the question and reflect their choices
+back in the setup summary.
+
+Be responsive here. Keep the setup summary short, readable, and easy to edit.
+
+## User Preference Input
+
+Users should be able to define role preferences in plain language. Do not force
+special syntax.
+
+Good examples:
+- "Keep me as conductor. Use Claude for investigation, Codex for implementation
+  and code review, and Gemini for UI."
+- "Use OpenCode instead of Codex for implementation."
+- "Use only Claude and Gemini."
+
+Translate these into a role map, reflect the chosen map back to the user, and
+then launch panes.
+
+## Setup UX Rules
+
+- keep the setup summary short enough to scan quickly
+- show `Detected`, `Missing`, `Conductor`, and `Recommended role map`
+- show `Actual role map` once overrides or fallbacks are applied
+- show `Using <fallback> for <role>` when a preferred CLI is unavailable
+- ask at most one setup question if the user has not already specified a map
+- start dispatching as soon as the role map is clear
+
+## Fallback Routing
+
+Use stable fallback order when a preferred CLI is missing:
+
+- `planning`: current agent, then Claude, then OpenCode, then Codex, then Gemini
+- `explore/investigate`: Claude, then OpenCode, then Codex, then Gemini, then
+  current agent
+- `implement`: Codex, then OpenCode, then Claude, then Gemini, then current
+  agent
+- `code review`: Codex, then Claude, then OpenCode, then Gemini, then current
+  agent
+- `ui design`: Gemini, then Claude, then OpenCode, then Codex, then current
+  agent
+
+If a fallback is used, say so explicitly before dispatching work. Do not quietly
+swap vendors and hope the user will not notice.
+
 ## Preconditions
 
 Before dispatching work:
 1. Run the setup check above and confirm `tmux` plus `tmux-cli` are available.
 2. Record which specialist CLIs are installed locally.
-3. Confirm the fixed pane map for `planner`, `designer`, and `implementer`, or
-   decide which panes you will launch.
-4. Confirm each target pane is alive enough to receive input, or launch it.
-5. Identify the task slices that can run independently.
+3. Choose the role map: use the user's map if provided, otherwise use the
+   recommended map plus fallbacks.
+4. Confirm which panes you will launch for the chosen roles.
+5. Confirm each target pane is alive enough to receive input, or launch it.
+6. Identify the task slices that can run independently.
 
-If the pane map is not already known from conversation, project docs, or user
-instructions, ask one focused question and then continue.
+If the role map is not already known from conversation or project docs, ask one
+focused question and then continue.
 
 If a specialist pane does not exist yet, launch it. Do not assume the other
 agents are already running.
@@ -179,14 +253,17 @@ Then break each stream into the smallest useful task that can complete without a
 long dependency chain.
 
 Good examples:
-- `planner`: requirements, acceptance criteria, sequencing, edge cases
+- `investigator`: requirements, acceptance criteria, sequencing, edge cases, repo
+  exploration
 - `designer`: UI critique, mobile behavior, hierarchy, copy adjustments
 - `implementer`: exact file targets, implementation steps, focused code changes
+- `reviewer`: pure code-quality review on stable slices
 
 Better small-slice examples:
-- `planner`: define invite-state transitions only
+- `investigator`: define invite-state transitions only
 - `designer`: critique the hero and form hierarchy only
 - `implementer`: update the invite validation module only
+- `reviewer`: inspect the validation slice for code quality only
 
 For larger tasks, the conductor may split further, for example:
 - logic stream
@@ -204,7 +281,8 @@ three small results than unwind one oversized delegation.
 
 After the first brainstorming pass, delegate all independent streams at once.
 
-Do not hold back the designer because the planner has not finished every detail.
+Do not hold back the designer because investigation has not finished every
+detail.
 Do not hold back the implementer if there is already a stable subproblem it can
  execute.
 
@@ -259,7 +337,7 @@ specialist panes that can participate in multiple check-in rounds.
 Use a compact prompt structure like this:
 
 ```text
-Role: [planner|designer|implementer]
+Role: [investigator|designer|implementer|reviewer]
 Workstream: [name]
 Goal: [what the user needs]
 Context:
@@ -331,10 +409,10 @@ Examples:
 - one implementer stream updates backend logic
 - another implementer stream updates UI components
 - designer reviews the live direction in parallel
-- planner checks acceptance criteria and edge cases in parallel
+- investigator checks acceptance criteria and edge cases in parallel
 
-If only one implementer pane exists, still keep planning and design running in
-parallel with implementation.
+If only one implementer pane exists, still keep investigation, design, or code
+review running in parallel with implementation when those streams are useful.
 
 Keep implementation slices small:
 - one module
@@ -360,13 +438,13 @@ scope at once, shrink the next assignment.
 
 ## Role Guidance
 
-### Planner
+### Investigator
 
 Use for:
-- decomposition into phases and streams
 - business rules and edge cases
 - acceptance criteria
 - identifying dependencies that block safe parallelization
+- repo exploration and second-opinion investigation
 
 Ask for artifacts such as:
 - concise implementation plan
@@ -374,8 +452,11 @@ Ask for artifacts such as:
 - decision memo
 - edge-case checklist
 
-Do not make the planner own the very first decomposition by default. The
-conductor should arrive with an initial plan already in hand.
+Do not outsource the first planning pass. The conductor should arrive with an
+initial plan already in hand. If another pane is useful for deeper analysis,
+use the `investigator` role rather than replacing the conductor.
+
+Default bias when available: Claude.
 
 ### Designer
 
@@ -405,13 +486,29 @@ independent progress.
 Prefer "change this file or function for this purpose" over "implement the
 feature".
 
+Default bias when available: Codex.
+
+### Reviewer
+
+Use for:
+- pure code-quality review
+- maintainability critique on stable slices
+- checking whether a narrow implementation change is clean enough to expand
+
+Ask for artifacts such as:
+- short quality review notes
+- risks, cleanup suggestions, and follow-up actions
+
+Default bias when available: Codex.
+
 ## Parallelization Heuristics
 
 Parallelize when:
 - streams touch different files or layers
 - one stream can define constraints while another executes a stable subproblem
 - design review can happen while code is being written
-- planner can validate edge cases while implementation proceeds
+- investigator can validate edge cases while implementation proceeds
+- reviewer can inspect stable slices while implementation continues elsewhere
 
 Prefer parallelizing many small safe slices over a few large risky slices.
 
@@ -434,6 +531,7 @@ Do not parallelize when:
 - Do not assume specialist panes already exist; launch them when needed.
 - Do not let parallel streams drift without conductor synthesis.
 - Do not treat vendor names as the core abstraction; use role ownership.
+- Do not silently override a user-defined role map.
 - If one pane is unavailable, redistribute the work and continue.
 
 ## Check-In Pattern
@@ -463,6 +561,7 @@ Stable panes reduce repeated setup cost and preserve short-term context.
 
 When reporting progress, prefer this structure:
 
+- `Setup`: detected tools, missing tools, chosen role map, fallbacks used
 - `Delegation`: which streams and roles are running
 - `Key decisions`: what came back and what you chose
 - `Implementation`: what changed, what is in progress, and what is next
@@ -475,12 +574,15 @@ message.
 
 For a new onboarding flow:
 - do the first planning pass locally in the conductor pane
+- show the detected-tool summary and recommended role map first
 - use `brainstorming` to identify invite-state logic, mobile UI design, and repo
   implementation as parallel streams
 - launch the needed specialist panes if they are not already running
-- send `planner` the invite-state rules only
+- send `investigator` the invite-state rules only if a second planning or
+  exploration pass will help
 - send `designer` the mobile-first layout and copy critique only
 - send `implementer` the first stable code slice immediately
+- send `reviewer` a stable slice if you want a pure code-quality pass in parallel
 - integrate the results, then launch the next round of small independent work
 
 ## Common Mistakes
@@ -511,3 +613,8 @@ orchestrator check-in.
 tooling mix changes.
 
 **Fix:** Keep roles stable and vendors swappable.
+
+**Mistake:** Hiding the role map or silently choosing fallbacks.
+
+**Fix:** Show detected tools, recommended assignments, and any fallback
+substitutions up front in a short setup summary.

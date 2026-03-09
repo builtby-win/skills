@@ -4,25 +4,31 @@
     {
       "id": 0,
       "prompt": "I'm starting a new invite-only onboarding flow for our app. It needs clean business logic around invite states, a polished mobile-first UI, and exact implementation changes in the repo. You are the only agent currently running; start whatever other agent CLIs you need and handle this in the best way using the tools available.",
-      "expected_output": "The agent does the first planning pass itself, uses brainstorming to split the work into small parallel slices, launches specialist CLIs in tmux as needed, and routes results back through conductor check-ins before the next round.",
+      "expected_output": "The agent keeps itself as conductor for the first planning pass, shows a short detected-tool summary plus recommended role map, uses brainstorming to split the work into small parallel slices, then launches specialist CLIs in tmux and routes results back through conductor check-ins.",
       "files": []
     },
     {
       "id": 1,
-      "prompt": "We need a billing settings redesign. I care about strong UX, clear plan-change and trial logic, and clean implementation without a lot of thrashing. Please take this from idea to execution. If the specialist panes are not already running, launch them.",
-      "expected_output": "The agent recognizes cross-functional scope, uses brainstorming to identify small independent streams, launches or reuses the needed specialist CLIs, runs tmux-based delegation in parallel, and keeps ownership boundaries clear with conductor-led check-ins between rounds.",
+      "prompt": "We need a billing settings redesign. I care about strong UX, clear plan-change and trial logic, and clean implementation without a lot of thrashing. Use Claude for exploration, Codex for implementation and code review, and Gemini for UI design unless one of them is missing. If the specialist panes are not already running, launch them.",
+      "expected_output": "The agent reflects the requested map back to the user, applies the sensible defaults where they match, reports any fallback substitutions if a preferred CLI is unavailable, and keeps ownership boundaries clear with conductor-led check-ins between rounds.",
       "files": []
     },
     {
       "id": 2,
       "prompt": "Build a notifications preferences revamp with backend preference rules, cleaner responsive UI, and exact repo implementation. Move quickly and use the best agent workflow you have. Start by making the initial plan yourself, then spin up any other agents you need.",
-      "expected_output": "The agent defaults to role-based orchestration, makes the initial plan in the conductor pane, launches small independent streams early, and continues parallelizing implementation rounds with explicit conductor evaluation after each batch.",
+      "expected_output": "The agent defaults to role-based orchestration, keeps the invoking agent as conductor and first planner, prefers Claude for investigation, Codex for implementation and pure code-quality review, Gemini for UI design, and continues parallelizing implementation rounds with explicit conductor evaluation after each batch.",
       "files": []
     },
     {
       "id": 3,
       "prompt": "Please tighten the spacing in the settings header and rename the primary button from 'Continue' to 'Save changes'.",
       "expected_output": "The agent decides this task is too small for orchestration and stays single-threaded while saying why.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I'm running this from Codex and want to stay the conductor myself. Use Gemini for UI design, Claude for repo exploration, and keep pure code-quality review separate from implementation when that helps. If one of those tools is missing, tell me the fallback before you start dispatching.",
+      "expected_output": "The agent preserves the invoking agent as conductor even though Codex is running the session, respects the user's custom role map, and reports any fallback substitutions before launching specialist panes.",
       "files": []
     }
   ]

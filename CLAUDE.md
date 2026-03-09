@@ -52,8 +52,37 @@ command -v tmux tmux-cli claude opencode codex gemini
 ```
 
 `god-mode` should explicitly detect installed specialist CLIs, report what is
-missing, and adapt its planner, designer, and implementer routing to the tools
-the user actually has installed.
+missing, show a recommended role map, and let the user override it.
+
+Recommended defaults:
+- conductor and first planning pass: this session
+- investigator: `claude`
+- implementer and reviewer: `codex`
+- designer: `gemini`
+
+If a preferred CLI is missing, `god-mode` should report the fallback it is using
+instead of silently swapping providers.
+
+Example fallback message:
+- `Codex not found, so using OpenCode for implementation and code review.`
+- `Gemini not found, so using Claude for UI design and critique.`
+
+Quick start:
+
+```text
+Use god-mode for this feature. Keep this session as conductor. Use Claude for
+investigation, Codex for implementation and code review, and Gemini for UI.
+```
+
+Shorter version:
+
+```text
+Use god-mode. This session stays conductor. Claude investigates. Codex implements and
+reviews. Gemini handles UI.
+```
+
+If you do not specify a map, `god-mode` should show the recommended one and ask
+for a quick override before launching panes.
 
 ## Current Repo-Owned Skills
 
