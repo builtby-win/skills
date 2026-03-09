@@ -132,7 +132,7 @@ Users should be able to define role preferences in plain language. Do not force
 special syntax.
 
 Good examples:
-- "Keep me as conductor. Use Claude for investigation, Codex for implementation
+- "Keep this session as conductor. Use Claude for investigation, Codex for implementation
   and code review, and Gemini for UI."
 - "Use OpenCode instead of Codex for implementation."
 - "Use only Claude and Gemini."
@@ -153,14 +153,15 @@ then launch panes.
 
 Use stable fallback order when a preferred CLI is missing:
 
-- `planning`: current agent, then Claude, then OpenCode, then Codex, then Gemini
-- `explore/investigate`: Claude, then OpenCode, then Codex, then Gemini, then
-  current agent
-- `implement`: Codex, then OpenCode, then Claude, then Gemini, then current
+- `conductor/first planning pass`: current agent, then Claude, then OpenCode,
+  then Codex, then Gemini
+- `investigator`: Claude, then OpenCode, then Codex, then Gemini, then current
   agent
-- `code review`: Codex, then Claude, then OpenCode, then Gemini, then current
+- `implementer`: Codex, then OpenCode, then Claude, then Gemini, then current
   agent
-- `ui design`: Gemini, then Claude, then OpenCode, then Codex, then current
+- `reviewer`: Codex, then Claude, then OpenCode, then Gemini, then current
+  agent
+- `designer`: Gemini, then Claude, then OpenCode, then Codex, then current
   agent
 
 If a fallback is used, say so explicitly before dispatching work. Do not quietly
