@@ -1,7 +1,7 @@
 # builtby.win Skills - Usage Guide
 
 This repo now maintains:
-- Playbooks-first standalone skills from this repo, including `god-mode`
+- Playbooks-first standalone skills from this repo, including `gaud-mode`
 - Optional Claude plugin compatibility wrappers for select skills
 - `@builtby.win/worktree` as a standalone npm package, not a repo-owned skill
 
@@ -14,7 +14,7 @@ global `~/.claude/CLAUDE.md` for that workflow logic.
 Install standalone skills with Playbooks:
 
 ```bash
-npx playbooks add skill builtby-win/skills --skill god-mode
+npx playbooks add skill builtby-win/skills --skill gaud-mode
 npx playbooks add skill builtby-win/skills --skill todo
 npx playbooks add skill builtby-win/skills --skill note
 npx playbooks add skill builtby-win/skills --skill blog
@@ -36,14 +36,14 @@ plugin wrappers:
 ```
 
 Claude plugins in this repo should be treated as compatibility wrappers around
-the core skill content for `todo`, `note`, and `blog`. `god-mode` is maintained
-as repo-owned Playbooks-first skill content under `skills/god-mode/`.
+the core skill content for `todo`, `note`, and `blog`. `gaud-mode` is maintained
+as repo-owned Playbooks-first skill content under `skills/gaud-mode/`.
 
-## God Mode Setup
+## Gaud Mode Setup
 
-`god-mode` is the repo-owned tmux orchestration skill. Before first use:
+`gaud-mode` is the repo-owned tmux orchestration skill. Before first use:
 
-1. Install `god-mode` from this repo.
+1. Install `gaud-mode` from this repo.
 2. Install the separate `tmux-cli` utility or skill in your agent environment.
 3. Ensure `tmux` and the specialist CLIs you care about are on `PATH`.
 4. Verify what is available:
@@ -52,8 +52,20 @@ as repo-owned Playbooks-first skill content under `skills/god-mode/`.
 command -v tmux tmux-cli claude opencode codex gemini
 ```
 
-`god-mode` should explicitly detect installed specialist CLIs, report what is
+`gaud-mode` should explicitly detect installed specialist CLIs, report what is
 missing, show a recommended role map, and let the user override it.
+
+Canonical skill name:
+- `gaud-mode`
+
+User-facing aliases that should still trigger it:
+- `gaud`
+- `god-mode`
+- `godmode`
+- `god`
+
+On the first run, if `~/.config/gaud.config.jsonl` does not exist,
+`gaud-mode` should offer to initialize it or use defaults for that run.
 
 Recommended defaults:
 - conductor and first planning pass: this session
@@ -61,7 +73,7 @@ Recommended defaults:
 - implementer and reviewer: `codex`
 - designer: `gemini`
 
-If a preferred CLI is missing, `god-mode` should report the fallback it is using
+If a preferred CLI is missing, `gaud-mode` should report the fallback it is using
 instead of silently swapping providers.
 
 Example fallback message:
@@ -71,23 +83,23 @@ Example fallback message:
 Quick start:
 
 ```text
-Use god-mode for this feature. Keep this session as conductor. Use Claude for
+Use gaud-mode for this feature. Keep this session as conductor. Use Claude for
 investigation, Codex for implementation and code review, and Gemini for UI.
 ```
 
 Shorter version:
 
 ```text
-Use god-mode. This session stays conductor. Claude investigates. Codex implements and
+Use gaud. This session stays conductor. Claude investigates. Codex implements and
 reviews. Gemini handles UI.
 ```
 
-If you do not specify a map, `god-mode` should show the recommended one and ask
+If you do not specify a map, `gaud-mode` should show the recommended one and ask
 for a quick override before launching panes.
 
 ## Current Repo-Owned Skills
 
-- `god-mode` - tmux-based multi-agent conductor workflow
+- `gaud-mode` - tmux-based multi-agent conductor workflow
 - `todo` - add tasks to Beads repositories with project inference
 - `note` - create draft blog posts from project learnings
 - `blog` - manage and publish blog drafts

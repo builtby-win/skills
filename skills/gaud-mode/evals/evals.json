@@ -1,0 +1,107 @@
+{
+  "skill_name": "gaud-mode",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I'm starting a new invite-only onboarding flow for our app. It needs clean business logic around invite states, a polished mobile-first UI, and exact implementation changes in the repo. You are the only agent currently running; start whatever other agent CLIs you need and handle this in the best way using the tools available. Use gaud-mode.",
+      "expected_output": "The agent keeps itself as conductor for the first planning pass, shows a short detected-tool summary plus recommended role map, uses brainstorming to split the work into small parallel slices, then launches specialist CLIs in tmux and routes results back through conductor check-ins.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "We need a billing settings redesign. I care about strong UX, clear plan-change and trial logic, and clean implementation without a lot of thrashing. Use gaud-mode. Use Claude for exploration, Codex for implementation and code review, and Gemini for UI design unless one of them is missing. If the specialist panes are not already running, launch them.",
+      "expected_output": "The agent reflects the requested map back to the user, applies the sensible defaults where they match, reports any fallback substitutions if a preferred CLI is unavailable, and keeps ownership boundaries clear with conductor-led check-ins between rounds.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Build a notifications preferences revamp with backend preference rules, cleaner responsive UI, and exact repo implementation. Move quickly and use gaud for this. Start by making the initial plan yourself, then spin up any other agents you need.",
+      "expected_output": "The agent treats `gaud` as an alias for the canonical `gaud-mode` skill, keeps the invoking agent as conductor and first planner, prefers Claude for investigation, Codex for implementation and pure code-quality review, Gemini for UI design, and continues parallelizing implementation rounds with explicit conductor evaluation after each batch.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Please tighten the spacing in the settings header and rename the primary button from 'Continue' to 'Save changes'. Use god if you think it helps.",
+      "expected_output": "The agent recognizes `god` as an alias trigger for `gaud-mode`, decides the task is too small for orchestration, and stays single-threaded while saying why.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I'm running this from Codex and want to stay the conductor myself. Use godmode for this. Use Gemini for UI design, Claude for repo exploration, and keep pure code-quality review separate from implementation when that helps. If one of those tools is missing, tell me the fallback before you start dispatching.",
+      "expected_output": "The agent preserves the invoking agent as conductor even though Codex is running the session, respects the user's custom role map, treats `godmode` as an alias for `gaud-mode`, and reports any fallback substitutions before launching specialist panes.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Use gaud-mode for a large feature. Prefer yolo or automatic proceed modes when the specialist CLIs support them. If a pane pauses waiting for permission to run a safe command, do not leave it stuck there.",
+      "expected_output": "The agent prefers `codex --yolo`, `claude --dangerously-skip-permissions`, and `gemini --yolo` when available, classifies paused panes as `waiting-permission` versus `waiting-user`, auto-proceeds only clearly safe execution approvals with tmux key sends, and escalates risky prompts instead of blindly pressing Enter.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Set up gaud-mode so specialist agents can notify the original orchestrator when they hit a permission gate or when they finish a batch. I want less manual polling and a cleaner callback loop.",
+      "expected_output": "The agent records the conductor pane ID, includes a `tmux-cli send \"GAUDMODE ...\" --pane=<conductor-pane>` callback protocol in kickoff prompts, and treats explicit `waiting-permission`, `waiting-user`, and `done` messages as first-class orchestration events while remaining able to recognize legacy `GODMODE` callbacks during transition.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "I'm installing gaud-mode into my agent setup and want to know where it should live and whether I should also install the Claude plugin wrapper for it.",
+      "expected_output": "The agent says `gaud-mode` is maintained only in `skills/gaud-mode/` as Playbooks-first skill content, does not present a Claude plugin wrapper as a maintained install path for this skill, and keeps any plugin-wrapper guidance limited to the other wrapper-backed skills.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Use gaud-mode for a substantial feature and launch the specialist panes now. Do not stop to ask me for the exact startup text after the panes open.",
+      "expected_output": "The conductor launches each requested specialist CLI with a fully formed kickoff prompt already passed on the command line at launch time, instead of opening blank panes and relying on manual follow-up typing after startup.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Use gaud-mode on this project. If the conductor or a specialist becomes unsure about a requirement or next step, I do not want anybody making up missing details.",
+      "expected_output": "The agent instructs confused specialists to ask back through the conductor and, when the conductor itself is unsure, asks the user instead of inventing requirements or guessing at missing constraints.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Show me example specialist launch commands for Claude, Codex, Gemini, and OpenCode under gaud-mode. Include the exact prefixes you expect to use in launch snippets.",
+      "expected_output": "Every specialist launch example is prefixed directly with `B2V_DISABLED=true`, such as `B2V_DISABLED=true claude ...`, `B2V_DISABLED=true codex ...`, `B2V_DISABLED=true gemini ...`, and `B2V_DISABLED=true opencode ...`, not the older `env` wrapper form.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Use gaud-mode for a multi-step batch and assume one specialist pane hits an optional update prompt, release note screen, telemetry notice, or similar non-essential setup interruption before it can continue.",
+      "expected_output": "The conductor or specialist safely skips or dismisses the non-essential setup interruption, continues the assigned batch without stalling on optional prompts, and escalates through the conductor instead of guessing whenever the update appears required or the safety of skipping is unclear.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "Use gaud-mode init. I have not created a global gaud config yet. I want Claude for investigation, Codex for implementation and review, and Gemini for UI, but I also want gaud-mode to offer defaults if I do not finish setup right now.",
+      "expected_output": "The agent treats `gaud-mode init` as a skill-driven setup flow, checks for `~/.config/gaud.config.jsonl`, notices when it is missing, and asks the user to initialize it or proceed with defaults for the current run. It explains that global defaults live in `~/.config/gaud.config.jsonl` and repo overrides live in `.gaud.config.jsonl`.",
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "Use gaud on this repo for a large feature. Assume I already ran gaud-mode init before and this repo also has a `.gaud.config.jsonl` override.",
+      "expected_output": "The agent treats `gaud` as an alias for `gaud-mode`, loads global defaults from `~/.config/gaud.config.jsonl`, loads repo overrides from `.gaud.config.jsonl`, merges the repo override on top of the global defaults, reflects the resulting map back to the user, and asks only for task-specific overrides before dispatching.",
+      "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "Use gaud-mode for a feature big enough to need four total panes including the conductor. Do not cram them all into one tmux window if it gets messy.",
+      "expected_output": "The agent keeps at most three total panes in one tmux window, counts the conductor pane toward that limit, reuses an existing tmux window with spare capacity before creating a new one, tracks each specialist by `session:window.pane`, and reports the multi-window layout clearly enough for follow-up routing.",
+      "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "Use gaud-mode for a substantial multi-role batch. Prefer Codex for implementation and review, but before launching, check whether the preferred providers still have usage available and fall back automatically if one is quota-blocked.",
+      "expected_output": "The agent performs a light provider-health preflight for the roles it is about to launch, classifies providers as `ready`, `quota-blocked`, `rate-limited`, `auth-blocked`, or `unknown`, and falls back before dispatch when a preferred provider is clearly unavailable without stalling on `unknown` status.",
+      "files": []
+    },
+    {
+      "id": 16,
+      "prompt": "After gaud-mode finishes the work, I do not want the tmux panes it created hanging around and cluttering the session.",
+      "expected_output": "The agent tracks which specialist panes and tmux windows it created, reuses only what it needs during the run, then cleans up the panes it spun up after the batch is complete. It closes empty tmux windows that gaud-mode created, but it does not kill the conductor pane or unrelated pre-existing user panes unless the user explicitly asks for that.",
+      "files": []
+    }
+  ]
+}
