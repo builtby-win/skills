@@ -1,6 +1,6 @@
 ---
 name: god-mode
-description: Use when substantial implementation work should be coordinated through tmux panes and the agent needs to launch or reuse specialist CLI agents after the first planning pass.
+description: Use when substantial implementation work should be coordinated through tmux panes and the agent needs to launch, supervise, or unblock specialist CLI agents after the first planning pass
 ---
 
 # God Mode
@@ -14,6 +14,11 @@ The conductor does not try to do all planning, design, investigation,
 implementation, and review alone. It uses the strongest available agents for
 each role, runs as much work in parallel as the task safely allows, and then
 integrates the results into one coherent direction.
+
+`god-mode` is not only a launcher. The conductor also supervises pane state:
+it prefers the most permissive safe launch mode, notices when a specialist is
+waiting on execution approval, and expects explicit done notifications when a
+batch is complete.
 
 The agent that starts `god-mode` is the conductor. It owns the first planning
 pass before spinning up specialists. Do not outsource initial decomposition too
@@ -56,6 +61,10 @@ Do not use this skill for:
 
 Delegate early. Keep tasks as small as possible. Parallelize aggressively where
 streams are actually independent. Integrate decisively.
+
+Launch with the highest-autonomy safe mode available. Treat permission stalls
+and completion signals as first-class orchestration events, not as vague
+terminal noise.
 
 Do not wait until the conductor has fully analyzed everything before delegating.
 Do enough grounding to route work well, then fan out.
@@ -175,12 +184,28 @@ Before dispatching work:
 4. Confirm which panes you will launch for the chosen roles.
 5. Confirm each target pane is alive enough to receive input, or launch it.
 6. Identify the task slices that can run independently.
+7. Record the conductor pane identifier in `session:window.pane` form so
+   specialists can notify it later.
 
 If the role map is not already known from conversation or project docs, ask one
 focused question and then continue.
 
 If a specialist pane does not exist yet, launch it. Do not assume the other
 agents are already running.
+
+## Pane State Model
+
+Treat each specialist pane as exactly one state at a time:
+
+| State | Meaning | Conductor action |
+| --- | --- | --- |
+| `working` | The specialist is actively thinking, editing, or running commands. | Leave it alone and re-check after the next `wait_idle`. |
+| `waiting-permission` | The pane stopped on a safe execution approval such as "run this command" or "press enter to continue". | Auto-proceed once, then `wait_idle` and `capture` again. |
+| `waiting-user` | The pane is blocked on a risky or product-shaping choice such as deploy, billing, secrets, auth, destructive git/file actions, production data, or unresolved scope. | Stop auto-proceeding and surface the choice to the user. |
+| `done` | The specialist finished a batch and reported back, ideally with an explicit callback. | Capture the result, integrate it, and assign the next small task. |
+
+Silence is not a state. After `tmux-cli wait_idle`, always classify the pane by
+capturing output or by handling an explicit callback from the specialist.
 
 ## Start With A Local Plan
 
@@ -298,8 +323,9 @@ If a specialist agent is not already running in the target pane, start it first.
 
 Preferred pattern:
 1. `tmux-cli launch "zsh"` to create a durable shell pane
-2. send the agent CLI launch command with its initial prompt
-3. wait for idle, then capture output
+2. start the specialist CLI in the highest-autonomy safe mode it supports
+3. send a kickoff prompt that includes the conductor pane ID and callback rules
+4. wait for idle, then capture output and classify the pane state
 
 Do this because launching the shell first preserves output if the agent command
 fails.
@@ -313,20 +339,44 @@ command -v tmux tmux-cli claude gemini opencode codex
 Use whichever specialist CLIs are available. Keep role ownership stable even if
 the exact vendor mix changes.
 
+Prefer the most permissive safe launch mode when the task is normal development
+work and the user has not asked for extra guardrails.
+
+Preferred autonomy flags when supported:
+- `claude --dangerously-skip-permissions`
+- `codex --yolo`
+- `gemini --yolo`
+
+Current caveats:
+- `opencode` does not currently expose a yolo mode, so the conductor must watch
+  that pane for permission stalls.
+- user-selected CLIs may or may not support autonomy flags; assume they may need
+  watchdog handling unless you know otherwise.
+
+Do not bypass approvals automatically for deploys, billing changes, credential
+access, auth changes, destructive git/file actions, production data operations,
+or other irreversible actions unless the user explicitly asked for that level of
+autonomy.
+
+General preferences such as "usually use yolo mode" do not count as approval for
+one of these risky actions. Only a clear task-specific user instruction for that
+exact risky action does. Broad phrasing such as "ship this now" still does not
+authorize deploys, destructive actions, or production-data changes by itself.
+
 Interactive launch examples with initial prompts:
 
 ```bash
 # Claude Code: interactive session with initial prompt
-claude "Explain this project and propose the first implementation slices."
+claude --dangerously-skip-permissions "Explain this project and propose the first implementation slices."
 
 # Gemini CLI: explicit interactive prompt mode
-gemini -i "Review the UI and suggest the next smallest design tasks."
+gemini --yolo -i "Review the UI and suggest the next smallest design tasks."
 
-# OpenCode: start TUI and seed it with a prompt
+# OpenCode: start TUI and seed it with a prompt (watch for permission gates)
 opencode --prompt "Analyze this project structure and identify one safe code slice."
 
 # Codex: interactive session with initial prompt
-codex "Implement only the next smallest backend change from this plan."
+codex --yolo "Implement only the next smallest backend change from this plan."
 ```
 
 Non-interactive subcommands like `opencode run`, `claude -p`, or `codex exec`
@@ -341,10 +391,20 @@ Use a compact prompt structure like this:
 Role: [investigator|designer|implementer|reviewer]
 Workstream: [name]
 Goal: [what the user needs]
+Coordinator pane: [session:window.pane]
 Context:
 - [relevant repo or product context]
 - [constraints]
 - [what other roles or streams are covering]
+
+If you hit a clearly safe execution approval, send:
+- `tmux-cli send "GODMODE waiting-permission role=[role] workstream=[name] summary=[short reason]" --pane=[conductor-pane]`
+
+If you hit a risky or ambiguous approval, send:
+- `tmux-cli send "GODMODE waiting-user role=[role] workstream=[name] summary=[short reason]" --pane=[conductor-pane]`
+
+When you finish this batch, send:
+- `tmux-cli send "GODMODE done role=[role] workstream=[name] summary=[one-line result]" --pane=[conductor-pane]`
 
 Deliverable:
 - [exact output wanted from this role or stream]
@@ -357,6 +417,9 @@ Reply with:
 
 Make the deliverable specific enough that another agent can use it without a
 long follow-up.
+
+Keep callback messages short and one-line. The conductor should be able to parse
+them quickly and decide the next move without reopening a long conversation.
 
 If the requested work feels broad, split it before sending. The conductor should
 prefer short loops over oversized delegations.
@@ -379,13 +442,50 @@ tmux-cli capture --pane=<role-pane>
 
 Avoid tight polling loops. Wait for idle, then capture.
 
+When a specialist needs to notify the conductor directly, use the same `send`
+command against the conductor pane:
+
+```bash
+tmux-cli send "GODMODE done role=implementer workstream=invite-validation summary=Patch ready and tests pass" --pane=<conductor-pane>
+```
+
 If the pane already has the right agent running, send the next task instead of
 restarting the CLI.
 
 If the pane has a shell or the wrong agent, reset it deliberately before sending
 new work.
 
-### 7. Integrate in rounds
+### 7. Run a permission watchdog
+
+After each `wait_idle`, classify the latest pane output before deciding the next
+move.
+
+Look for these patterns:
+- `working`: the agent is still reasoning, editing, or actively streaming output
+- `waiting-permission`: approval UI, `Run command?`, `[y/N]`, `Press Enter to continue`, or a safe execution menu
+- `waiting-user`: scope questions or risky approvals involving deploys, secrets, billing, auth, destructive operations, or unrelated network access
+- `done`: a clear completion summary or an explicit `GODMODE done ...` callback
+
+For a clearly safe execution approval, auto-proceed once and then re-check:
+
+```bash
+tmux-cli send "Down" --pane=<role-pane> --enter=False
+tmux-cli send "" --pane=<role-pane>
+tmux-cli wait_idle --pane=<role-pane> --idle-time=2.0 --timeout=120
+tmux-cli capture --pane=<role-pane>
+```
+
+Use `Up` or `Down` only when the approval UI needs selection movement. If Enter
+already accepts the safe default, send Enter only.
+
+`tmux-cli send "Up"` and `tmux-cli send "Down"` pass those tmux key names
+through to `tmux send-keys`, so they navigate menus instead of typing the words
+literally.
+
+Do not hammer Enter blindly. If the same prompt repeats or the risk is unclear,
+stop auto-proceeding and reclassify the pane as `waiting-user`.
+
+### 8. Integrate in rounds
 
 When outputs return:
 - compare recommendations
@@ -398,10 +498,11 @@ Think in orchestration rounds, not one giant delegation followed by one giant
 summary.
 
 Each round should end with a check-in through the conductor. Specialists do not
-freelance indefinitely. They complete a small task, report back, and let the
-conductor decide whether to continue, redirect, merge, or stop.
+freelance indefinitely. They complete a small task, report back through capture
+or an explicit callback, and let the conductor decide whether to continue,
+redirect, merge, or stop.
 
-### 8. Keep implementation parallelized
+### 9. Keep implementation parallelized
 
 Once the direction is stable enough, keep searching for independent
 implementation slices.
@@ -424,10 +525,12 @@ Keep implementation slices small:
 
 After each slice, check back in with the conductor before expanding scope.
 
-### 9. Integrate and unblock
+### 10. Integrate and unblock
 
 The conductor should:
 - synthesize outputs into one decision
+- treat `GODMODE waiting-permission`, `GODMODE waiting-user`, and `GODMODE done`
+  callbacks as events that deserve immediate triage
 - unblock stuck streams with sharper prompts or extra context
 - decide when to stop parallelizing and converge
 - write code itself when needed to stitch pieces together or maintain momentum
@@ -533,6 +636,13 @@ Do not parallelize when:
 - Do not let parallel streams drift without conductor synthesis.
 - Do not treat vendor names as the core abstraction; use role ownership.
 - Do not silently override a user-defined role map.
+- Do not assume a quiet pane is done without a fresh capture or explicit done
+  callback.
+- Do not press Enter repeatedly without reading the latest approval screen.
+- Do not auto-approve prompts about deploys, billing, credentials, auth,
+  destructive git/file actions, production data, or unrelated network scope.
+- Do not forget to pass the conductor pane ID and callback protocol to each
+  specialist.
 - If one pane is unavailable, redistribute the work and continue.
 
 ## Check-In Pattern
@@ -540,7 +650,9 @@ Do not parallelize when:
 Use short loops:
 1. conductor defines the next smallest useful tasks
 2. specialists work in parallel
-3. specialists report back
+3. specialists send `GODMODE waiting-permission`, `GODMODE waiting-user`, or
+   `GODMODE done` callbacks when needed; otherwise the conductor uses
+   `wait_idle` plus `capture`
 4. conductor evaluates the results
 5. conductor decides the next small batch
 
@@ -552,11 +664,41 @@ not skip it just because the specialist seems to be making progress.
 For each specialist role:
 1. decide whether a pane already exists for that role
 2. if not, launch a new shell pane with `tmux-cli launch "zsh"`
-3. start the correct CLI in that pane with an initial prompt
-4. keep reusing that pane across check-in rounds
-5. restart only when the pane is broken, misassigned, or unrecoverable
+3. start the correct CLI in that pane with the safest high-autonomy mode
+   available
+4. tell the specialist the conductor pane ID and callback protocol
+5. keep reusing that pane across check-in rounds
+6. restart only when the pane is broken, misassigned, or unrecoverable
 
 Stable panes reduce repeated setup cost and preserve short-term context.
+
+## Quick Reference
+
+| Situation | What to do |
+| --- | --- |
+| CLI supports yolo or auto-proceed | Use it for normal dev work so the pane spends less time waiting for approval. |
+| CLI has no yolo mode | Expect to classify the pane after each `wait_idle` and handle permission stalls yourself. |
+| Safe execution approval prompt | Move the selection with `Up` or `Down` if needed, send Enter once, then capture again. |
+| Risky or ambiguous approval prompt | Stop auto-proceeding, mark it `waiting-user`, and surface the choice to the user. |
+| Specialist finishes a batch | Read the `GODMODE done` callback, capture the pane if needed, and assign the next small slice. |
+
+## Rationalizations To Reject
+
+| Excuse | Reality |
+| --- | --- |
+| `I launched with --yolo, so I do not need to monitor the pane.` | Some CLIs still pause, and some panes may not support yolo at all. Supervision still matters. |
+| `The pane went quiet, so it must be done.` | Quiet often means waiting. Capture output or require an explicit done callback. |
+| `It is faster to press Enter on every prompt.` | Blind approval is how you auto-accept the wrong thing. Read the screen first. |
+| `The specialist can summarize later when I get around to checking it.` | Explicit callbacks keep the conductor from wasting time on manual polling. |
+
+## Red Flags - Stop And Reclassify
+
+- `wait_idle` returned but you have not captured the pane yet
+- the same approval screen appears twice after one auto-proceed attempt
+- the prompt mentions deploys, billing, secrets, auth, destructive actions, or
+  production data
+- the specialist never received the conductor pane ID
+- you are about to call a pane `done` only because it stopped printing output
 
 ## User-Facing Output
 
@@ -564,6 +706,7 @@ When reporting progress, prefer this structure:
 
 - `Setup`: detected tools, missing tools, chosen role map, fallbacks used
 - `Delegation`: which streams and roles are running
+- `Queues`: which panes are `waiting-permission`, `waiting-user`, or `done`
 - `Key decisions`: what came back and what you chose
 - `Implementation`: what changed, what is in progress, and what is next
 - `Risks`: unresolved issues or convergence points
@@ -579,11 +722,18 @@ For a new onboarding flow:
 - use `brainstorming` to identify invite-state logic, mobile UI design, and repo
   implementation as parallel streams
 - launch the needed specialist panes if they are not already running
+- prefer `codex --yolo`, `claude --dangerously-skip-permissions`, and
+  `gemini --yolo` when those CLIs are handling normal dev work
 - send `investigator` the invite-state rules only if a second planning or
   exploration pass will help
 - send `designer` the mobile-first layout and copy critique only
-- send `implementer` the first stable code slice immediately
+- send `implementer` the first stable code slice immediately, along with the
+  conductor pane ID and callback format
 - send `reviewer` a stable slice if you want a pure code-quality pass in parallel
+- if a pane pauses on a safe execution approval, auto-proceed once and then
+  re-check the capture
+- if a specialist finishes a batch, let it notify the conductor with
+  `tmux-cli send "GODMODE done ..." --pane=<conductor-pane>`
 - integrate the results, then launch the next round of small independent work
 
 ## Common Mistakes
@@ -605,6 +755,22 @@ its initial prompt.
 orchestrator check-in.
 
 **Fix:** Use short batches and reevaluate through the conductor after each one.
+
+**Mistake:** Assuming a pane is finished just because it stopped printing.
+
+**Fix:** Capture the pane or require an explicit `GODMODE done` callback before
+marking it `done`.
+
+**Mistake:** Auto-approving every execution prompt the same way.
+
+**Fix:** Only auto-proceed clearly safe execution approvals. Escalate risky or
+ambiguous prompts to the user.
+
+**Mistake:** Forgetting to tell specialists how to notify the conductor.
+
+**Fix:** Include the conductor pane ID plus the `GODMODE waiting-permission`,
+`GODMODE waiting-user`, and `GODMODE done` callback examples in every kickoff
+prompt.
 
 **Mistake:** Using orchestration as a substitute for making decisions.
 

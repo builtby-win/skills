@@ -30,6 +30,18 @@
       "prompt": "I'm running this from Codex and want to stay the conductor myself. Use Gemini for UI design, Claude for repo exploration, and keep pure code-quality review separate from implementation when that helps. If one of those tools is missing, tell me the fallback before you start dispatching.",
       "expected_output": "The agent preserves the invoking agent as conductor even though Codex is running the session, respects the user's custom role map, and reports any fallback substitutions before launching specialist panes.",
       "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Use god-mode for a large feature. Prefer yolo or automatic proceed modes when the specialist CLIs support them. If a pane pauses waiting for permission to run a safe command, do not leave it stuck there.",
+      "expected_output": "The agent prefers `codex --yolo`, `claude --dangerously-skip-permissions`, and `gemini --yolo` when available, classifies paused panes as `waiting-permission` versus `waiting-user`, auto-proceeds only clearly safe execution approvals with tmux key sends, and escalates risky prompts instead of blindly pressing Enter.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Set up god-mode so specialist agents can notify the original orchestrator when they hit a permission gate or when they finish a batch. I want less manual polling and a cleaner callback loop.",
+      "expected_output": "The agent records the conductor pane ID, includes a `tmux-cli send \"GODMODE ...\" --pane=<conductor-pane>` callback protocol in kickoff prompts, and treats explicit `waiting-permission`, `waiting-user`, and `done` messages as first-class orchestration events.",
+      "files": []
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "god-mode",
-  "description": "Use when substantial implementation work should be coordinated through tmux panes and the agent needs to launch or reuse specialist CLI agents after the first planning pass",
+  "description": "Use when substantial implementation work should be coordinated through tmux panes and the agent needs to launch, supervise, or unblock specialist CLI agents after the first planning pass",
   "version": "1.0.0",
   "author": {
     "name": "Winston Zhao"
