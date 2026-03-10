@@ -42,6 +42,36 @@
       "prompt": "Set up god-mode so specialist agents can notify the original orchestrator when they hit a permission gate or when they finish a batch. I want less manual polling and a cleaner callback loop.",
       "expected_output": "The agent records the conductor pane ID, includes a `tmux-cli send \"GODMODE ...\" --pane=<conductor-pane>` callback protocol in kickoff prompts, and treats explicit `waiting-permission`, `waiting-user`, and `done` messages as first-class orchestration events.",
       "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "I'm installing god-mode into my agent setup and want to know where it should live and whether I should also install the Claude plugin wrapper for it.",
+      "expected_output": "The agent says `god-mode` is maintained only in `skills/god-mode/` as Playbooks-first skill content, does not present the Claude plugin wrapper as a maintained install path for this skill, and keeps any plugin-wrapper guidance limited to the other wrapper-backed skills.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Use god-mode for a substantial feature and launch the specialist panes now. Do not stop to ask me for the exact startup text after the panes open.",
+      "expected_output": "The conductor launches each requested specialist CLI with a fully formed kickoff prompt already passed on the command line at launch time, instead of opening blank panes and relying on manual follow-up typing after startup.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Use god-mode on this project. If the conductor or a specialist becomes unsure about a requirement or next step, I do not want anybody making up missing details.",
+      "expected_output": "The agent instructs confused specialists to ask back through the conductor and, when the conductor itself is unsure, asks the user instead of inventing requirements or guessing at missing constraints.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Show me example specialist launch commands for Claude, Codex, Gemini, and OpenCode under god-mode. Include the exact prefixes you expect to use in launch snippets.",
+      "expected_output": "Every specialist launch example is prefixed with `env B2V_DISABLED=true`, such as `env B2V_DISABLED=true claude ...`, `env B2V_DISABLED=true codex ...`, `env B2V_DISABLED=true gemini ...`, and `env B2V_DISABLED=true opencode ...`.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Use god-mode for a multi-step batch and assume one specialist pane hits an optional update prompt, release note screen, telemetry notice, or similar non-essential setup interruption before it can continue.",
+      "expected_output": "The conductor or specialist safely skips or dismisses the non-essential setup interruption, continues the assigned batch without stalling on optional prompts, and escalates through the conductor instead of guessing whenever the update appears required or the safety of skipping is unclear.",
+      "files": []
     }
   ]
 }

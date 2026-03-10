@@ -324,9 +324,9 @@ If a specialist agent is not already running in the target pane, start it first.
 
 Preferred pattern:
 1. `tmux-cli launch "zsh"` to create a durable shell pane
-2. start the specialist CLI in the highest-autonomy safe mode it supports
-3. send a kickoff prompt that includes the conductor pane ID and callback rules
-4. wait for idle, then capture output and classify the pane state
+2. start the specialist CLI with `env B2V_DISABLED=true` in the highest-autonomy safe mode it supports
+3. seed the kickoff prompt at process start whenever the CLI supports a startup prompt
+4. use `tmux-cli send` for later rounds, then wait for idle, capture output, and classify the pane state
 
 Do this because launching the shell first preserves output if the agent command
 fails.
@@ -344,15 +344,26 @@ Prefer the most permissive safe launch mode when the task is normal development
 work and the user has not asked for extra guardrails.
 
 Preferred autonomy flags when supported:
-- `claude --dangerously-skip-permissions`
-- `codex --yolo`
-- `gemini --yolo`
+- `env B2V_DISABLED=true claude --dangerously-skip-permissions "<kickoff prompt>"`
+- `env B2V_DISABLED=true codex --yolo "<kickoff prompt>"`
+- `env B2V_DISABLED=true gemini --yolo -i "<kickoff prompt>"`
+- `env B2V_DISABLED=true opencode --prompt "<kickoff prompt>"`
 
 Current caveats:
 - `opencode` does not currently expose a yolo mode, so the conductor must watch
-  that pane for permission stalls.
+  that pane for permission stalls even when it starts with `--prompt`.
 - user-selected CLIs may or may not support autonomy flags; assume they may need
   watchdog handling unless you know otherwise.
+
+If a CLI supports a startup prompt or initial prompt flag, put the first kickoff
+message in the launch command instead of launching empty and sending the prompt
+afterward.
+
+If a prompt is only about an optional update or non-essential setup step, skip
+it and continue.
+
+If the update appears required for the assigned task, or you are not sure
+whether skipping is safe, escalate instead of guessing.
 
 Do not bypass approvals automatically for deploys, billing changes, credential
 access, auth changes, destructive git/file actions, production data operations,
@@ -364,25 +375,26 @@ one of these risky actions. Only a clear task-specific user instruction for that
 exact risky action does. Broad phrasing such as "ship this now" still does not
 authorize deploys, destructive actions, or production-data changes by itself.
 
-Interactive launch examples with initial prompts:
+Interactive launch examples with startup prompt seeding:
 
 ```bash
-# Claude Code: interactive session with initial prompt
-claude --dangerously-skip-permissions "Explain this project and propose the first implementation slices."
+# Claude Code: seed the startup prompt on launch
+env B2V_DISABLED=true claude --dangerously-skip-permissions "Explain this project and propose the first implementation slices."
 
 # Gemini CLI: explicit interactive prompt mode
-gemini --yolo -i "Review the UI and suggest the next smallest design tasks."
+env B2V_DISABLED=true gemini --yolo -i "Review the UI and suggest the next smallest design tasks."
 
-# OpenCode: start TUI and seed it with a prompt (watch for permission gates)
-opencode --prompt "Analyze this project structure and identify one safe code slice."
+# OpenCode: start TUI and seed it with a startup prompt (watch for permission gates)
+env B2V_DISABLED=true opencode --prompt "Analyze this project structure and identify one safe code slice."
 
-# Codex: interactive session with initial prompt
-codex --yolo "Implement only the next smallest backend change from this plan."
+# Codex: seed the startup prompt on launch
+env B2V_DISABLED=true codex --yolo "Implement only the next smallest backend change from this plan."
 ```
 
 Non-interactive subcommands like `opencode run`, `claude -p`, or `codex exec`
 are useful for one-shot tasks, but `god-mode` should usually prefer interactive
-specialist panes that can participate in multiple check-in rounds.
+specialist panes that can participate in multiple check-in rounds. After the
+startup prompt, use `tmux-cli send` for later follow-ups and new batches.
 
 ### 5. Use a consistent kickoff message
 
@@ -397,6 +409,18 @@ Context:
 - [relevant repo or product context]
 - [constraints]
 - [what other roles or streams are covering]
+
+Autonomy policy:
+- Continue through safe repo exploration, file reads, code edits, and local verification needed for this batch.
+- Skip optional update prompts, release notes, telemetry notices, and other non-essential setup screens when they are not required.
+- If you are unsure what to do next, stop guessing and ask through the conductor.
+
+If an update or setup interruption appears required for the assigned task, or you are not sure whether skipping is safe, escalate instead of guessing.
+
+If you are confused about the requested outcome, do not invent the missing requirement. Ask one targeted question through the conductor.
+
+If you are confused or the request is ambiguous, send:
+- `tmux-cli send "GODMODE waiting-user role=[role] workstream=[name] summary=[targeted question]" --pane=[conductor-pane]`
 
 If you hit a clearly safe execution approval, send:
 - `tmux-cli send "GODMODE waiting-permission role=[role] workstream=[name] summary=[short reason]" --pane=[conductor-pane]`
@@ -677,10 +701,12 @@ Stable panes reduce repeated setup cost and preserve short-term context.
 
 | Situation | What to do |
 | --- | --- |
-| CLI supports yolo or auto-proceed | Use it for normal dev work so the pane spends less time waiting for approval. |
-| CLI has no yolo mode | Expect to classify the pane after each `wait_idle` and handle permission stalls yourself. |
+| CLI supports startup prompt plus yolo or auto-proceed | Launch it with `env B2V_DISABLED=true` in its highest-autonomy safe mode and seed the kickoff prompt at process start. |
+| CLI has no yolo mode | Still launch it with `env B2V_DISABLED=true`; expect to classify the pane after each `wait_idle` and handle permission stalls yourself. |
 | Safe execution approval prompt | Move the selection with `Up` or `Down` if needed, send Enter once, then capture again. |
+| Optional update or non-essential setup prompt | Skip optional update prompts, release notes, telemetry notices, and other non-essential setup screens when they are not required. |
 | Risky or ambiguous approval prompt | Stop auto-proceeding, mark it `waiting-user`, and surface the choice to the user. |
+| Confused specialist | Do not let it guess; have it send one targeted `GODMODE waiting-user` question through the conductor. |
 | Specialist finishes a batch | Read the `GODMODE done` callback, capture the pane if needed, and assign the next small slice. |
 
 ## Rationalizations To Reject
@@ -688,16 +714,21 @@ Stable panes reduce repeated setup cost and preserve short-term context.
 | Excuse | Reality |
 | --- | --- |
 | `I launched with --yolo, so I do not need to monitor the pane.` | Some CLIs still pause, and some panes may not support yolo at all. Supervision still matters. |
+| `I can launch first and send the kickoff later.` | If the CLI supports a startup prompt, seed the initial prompt at process start so the pane starts working immediately. |
 | `The pane went quiet, so it must be done.` | Quiet often means waiting. Capture output or require an explicit done callback. |
 | `It is faster to press Enter on every prompt.` | Blind approval is how you auto-accept the wrong thing. Read the screen first. |
+| `The update screen is probably required.` | If it is only about an optional update or non-essential setup step, skip it and continue. If you are not sure, escalate instead of guessing. |
+| `The agent seems confused, but it can probably infer the missing detail.` | If you are confused about the requested outcome, do not invent the missing requirement. Ask one targeted question instead. |
 | `The specialist can summarize later when I get around to checking it.` | Explicit callbacks keep the conductor from wasting time on manual polling. |
 
 ## Red Flags - Stop And Reclassify
 
 - `wait_idle` returned but you have not captured the pane yet
 - the same approval screen appears twice after one auto-proceed attempt
+- the pane is sitting on an optional update or setup interruption you have not classified yet
 - the prompt mentions deploys, billing, secrets, auth, destructive actions, or
   production data
+- the specialist sounds confused and is starting to guess at the requirement
 - the specialist never received the conductor pane ID
 - you are about to call a pane `done` only because it stopped printing output
 
@@ -723,16 +754,23 @@ For a new onboarding flow:
 - use `brainstorming` to identify invite-state logic, mobile UI design, and repo
   implementation as parallel streams
 - launch the needed specialist panes if they are not already running
-- prefer `codex --yolo`, `claude --dangerously-skip-permissions`, and
-  `gemini --yolo` when those CLIs are handling normal dev work
+- prefer startup prompt seeding with `env B2V_DISABLED=true codex --yolo`,
+  `env B2V_DISABLED=true claude --dangerously-skip-permissions`,
+  `env B2V_DISABLED=true gemini --yolo -i`, or
+  `env B2V_DISABLED=true opencode --prompt` when those CLIs are handling normal
+  dev work
 - send `investigator` the invite-state rules only if a second planning or
   exploration pass will help
 - send `designer` the mobile-first layout and copy critique only
 - send `implementer` the first stable code slice immediately, along with the
-  conductor pane ID and callback format
+  conductor pane ID, callback format, and the autonomy policy in the kickoff
 - send `reviewer` a stable slice if you want a pure code-quality pass in parallel
 - if a pane pauses on a safe execution approval, auto-proceed once and then
   re-check the capture
+- if a pane shows only an optional update or non-essential setup step, skip it
+  and continue
+- if a specialist is confused or the request is ambiguous, have it send one
+  targeted `GODMODE waiting-user` question instead of guessing
 - if a specialist finishes a batch, let it notify the conductor with
   `tmux-cli send "GODMODE done ..." --pane=<conductor-pane>`
 - integrate the results, then launch the next round of small independent work
@@ -750,7 +788,7 @@ For a new onboarding flow:
 **Mistake:** Assuming the specialist agents are already open somewhere in tmux.
 
 **Fix:** Explicitly launch the CLI you need in a shell pane, then seed it with
-its initial prompt.
+its startup prompt.
 
 **Mistake:** Letting a specialist keep running on a large thread without an
 orchestrator check-in.
@@ -766,6 +804,17 @@ marking it `done`.
 
 **Fix:** Only auto-proceed clearly safe execution approvals. Escalate risky or
 ambiguous prompts to the user.
+
+**Mistake:** Treating optional update or setup prompts like blockers.
+
+**Fix:** If a prompt is only about an optional update or non-essential setup
+step, skip it and continue. If you are not sure whether skipping is safe,
+escalate instead of guessing.
+
+**Mistake:** Letting a confused specialist fill in missing requirements.
+
+**Fix:** If you are confused about the requested outcome, do not invent the
+missing requirement. Ask one targeted question through the conductor.
 
 **Mistake:** Forgetting to tell specialists how to notify the conductor.
 

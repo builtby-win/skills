@@ -5,7 +5,7 @@
     "email": "winstonzhao@ucla.edu"
   },
   "metadata": {
-    "description": "Tmux orchestration, task capture, and writing utilities with optional Claude plugin wrappers"
+    "description": "Task capture and writing utilities with Claude plugin wrappers for todo, note, and blog"
   },
   "plugins": [
     {
@@ -24,12 +24,6 @@
       "name": "blog",
       "source": "./plugins/blog",
       "description": "Manage and publish draft blog posts",
-      "version": "1.0.0"
-    },
-    {
-      "name": "god-mode",
-      "source": "./plugins/god-mode",
-      "description": "Use when substantial implementation work should be coordinated through tmux panes and the agent needs to launch or reuse specialist CLI agents after the first planning pass",
       "version": "1.0.0"
     }
   ]

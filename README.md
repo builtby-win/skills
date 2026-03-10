@@ -1,7 +1,7 @@
 # builtby.win Skills
 
 Custom agent skills from builtby.win, with Playbooks-first standalone installs
-and optional Claude plugin wrappers.
+and optional Claude plugin wrappers for select skills.
 
 ## Installation
 
@@ -22,11 +22,11 @@ Claude skills directory.
 
 ### Optional: Claude Plugin Marketplace
 
-If you prefer the Claude plugin workflow, this repo still supports it:
+If you prefer the Claude plugin workflow, this repo still supports wrappers for
+`todo`, `note`, and `blog`:
 
 ```bash
 /plugin marketplace add builtby-win/skills
-/plugin install god-mode@builtby-win-skills
 /plugin install todo@builtby-win-skills
 /plugin install note@builtby-win-skills
 /plugin install blog@builtby-win-skills
@@ -98,7 +98,6 @@ docs/       # Plans and supporting repo documentation
 
 ### Claude plugin skills
 
-- `god-mode` - tmux-based multi-agent conductor workflow
 - `todo` - add tasks to Beads repositories with project inference
 - `note` - create draft blog posts from project learnings
 - `blog` - manage and publish blog drafts
@@ -123,11 +122,12 @@ npx playbooks add skill builtby-win/skills --skill god-mode
 ## Claude Plugins vs Standalone Skills
 
 Standalone skills in `skills/` are the source of truth. `plugins/` remains an
-optional compatibility layer for Claude plugin installs.
+optional compatibility layer for Claude plugin installs where wrappers still
+exist.
 
 For example:
 - `skills/god-mode/` is the Playbooks-first distribution target
-- `plugins/god-mode/` is the compatibility wrapper for Claude plugin installs
+- `plugins/todo/` is a compatibility wrapper for Claude plugin installs
 
 ## Included Standalone Skills
 

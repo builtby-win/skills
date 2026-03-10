@@ -1,8 +1,8 @@
 # builtby.win Skills - Usage Guide
 
 This repo now maintains:
-- Playbooks-first standalone skills from this repo
-- Optional Claude plugin compatibility wrappers for the same skills
+- Playbooks-first standalone skills from this repo, including `god-mode`
+- Optional Claude plugin compatibility wrappers for select skills
 - `@builtby.win/worktree` as a standalone npm package, not a repo-owned skill
 
 Workflow skills like `/work`, `/ship`, `/pr`, `/done`, and the old `worktree`
@@ -25,18 +25,19 @@ Playbooks is the recommended distribution path for repo-owned custom skills in
 
 ## Optional Claude Plugin Install Path
 
-If you prefer Claude plugins, add the marketplace and install plugin wrappers:
+If you prefer Claude plugins, add the marketplace and install the remaining
+plugin wrappers:
 
 ```bash
 /plugin marketplace add builtby-win/skills
-/plugin install god-mode@builtby-win-skills
 /plugin install todo@builtby-win-skills
 /plugin install note@builtby-win-skills
 /plugin install blog@builtby-win-skills
 ```
 
 Claude plugins in this repo should be treated as compatibility wrappers around
-the core skill content when a standalone skill also exists.
+the core skill content for `todo`, `note`, and `blog`. `god-mode` is maintained
+as repo-owned Playbooks-first skill content under `skills/god-mode/`.
 
 ## God Mode Setup
 
