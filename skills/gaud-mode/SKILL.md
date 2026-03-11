@@ -15,29 +15,29 @@ Treat these as user-facing aliases that should trigger the same skill:
 - `godmode`
 - `god`
 
-Run substantial implementation work through a conductor agent that coordinates
+Run substantial implementation work through an orchestrator agent that coordinates
 specialist agents in tmux panes and, when needed, across multiple tmux windows.
 
-`gaud-mode` is not only a launcher. The conductor also:
+`gaud-mode` is not only a launcher. The orchestrator also:
 - performs the first planning pass locally
 - launches specialists with direct `B2V_DISABLED=true <cli>` prefixes
 - supervises permission stalls and explicit callbacks
 - keeps a registry of which panes and windows it created
 - cleans up the panes and empty windows it spun up when the batch is done
 
-The agent that starts `gaud-mode` is the conductor. It owns the first planning
+The agent that starts `gaud-mode` is the orchestrator. It owns the first planning
 pass before spinning up specialists. Do not outsource initial decomposition too
 early.
 
 Treat the system as role-based first and vendor-based second:
-- `conductor`: planning, decomposition, synthesis, and cleanup
+- `orchestrator`: planning, decomposition, synthesis, and cleanup
 - `investigator`: exploration, repo investigation, and second-opinion analysis
 - `designer`: UI, visual quality, and interaction critique
 - `implementer`: exact file changes and tightly scoped execution
 - `reviewer`: pure code-quality review on stable slices
 
 Default routing tendencies when those CLIs are available:
-- this session: conductor and first planning pass
+- this session: orchestrator and first planning pass
 - Claude: investigation and planning follow-up
 - Gemini: UI design and critique
 - Codex: implementation and pure code-quality review
@@ -72,7 +72,7 @@ Launch with the highest-autonomy safe mode available. Treat permission stalls,
 completion signals, provider exhaustion, and pane cleanup as first-class
 orchestration events, not as terminal noise.
 
-Do not wait until the conductor has fully analyzed everything before delegating.
+Do not wait until the orchestrator has fully analyzed everything before delegating.
 Do enough grounding to route work well, then fan out.
 
 ## Invocation Aliases
@@ -95,7 +95,7 @@ Act more like a provider detector than a guesser.
 Minimum requirements:
 - `tmux`
 - `tmux-cli`
-- the current conductor CLI
+- the current orchestrator CLI
 - at least one specialist CLI you can launch in another pane
 
 Recommended specialist CLIs:
@@ -155,7 +155,7 @@ Gaud setup
 - Repo override: missing (`.gaud.config.jsonl`)
 
 Recommended role map
-- conductor/first planning pass: this session
+- orchestrator/first planning pass: this session
 - investigator: claude
 - implementer: codex
 - reviewer: codex
@@ -182,7 +182,7 @@ Users should be able to define role preferences in plain language. Do not force
 special syntax.
 
 Good examples:
-- `Keep this session as conductor. Use Claude for investigation, Codex for implementation and code review, and Gemini for UI.`
+- `Keep this session as orchestrator. Use Claude for investigation, Codex for implementation and code review, and Gemini for UI.`
 - `Use OpenCode instead of Codex for implementation in this repo.`
 - `Use only Claude and Gemini.`
 - `Use gaud, but keep repo overrides from .gaud.config.jsonl.`
@@ -207,7 +207,7 @@ then launch panes.
 Use stable fallback order when a preferred CLI is missing or unavailable for the
 current round:
 
-- `conductor/first planning pass`: current agent, then Claude, then OpenCode,
+- `orchestrator/first planning pass`: current agent, then Claude, then OpenCode,
   then Codex, then Gemini
 - `investigator`: Claude, then OpenCode, then Codex, then Gemini, then current
   agent
@@ -257,7 +257,7 @@ Before dispatching work:
 3. choose the role map: user override, else repo override, else global default,
    else recommended map plus fallbacks
 4. identify the task slices that can run independently
-5. record the conductor pane identifier in `session:window.pane` form
+5. record the orchestrator pane identifier in `session:window.pane` form
 6. build or refresh a role registry that tracks pane identity and whether a pane
    or window was created by `gaud-mode`
 7. confirm each target pane is alive enough to receive input, or launch it
@@ -271,7 +271,7 @@ Treat tmux windows as capacity buckets.
 
 Layout rules:
 - keep at most three total panes in one tmux window
-- the conductor pane counts toward that limit when it lives in the window
+- the orchestrator pane counts toward that limit when it lives in the window
 - before creating a new tmux window, first reuse an existing gaud-managed window
   with spare capacity
 - when a fourth pane would make the current window cluttered, use another tmux
@@ -298,7 +298,7 @@ windows reduce visual clutter.
 
 Treat each specialist pane as exactly one state at a time:
 
-| State | Meaning | Conductor action |
+| State | Meaning | Orchestrator action |
 | --- | --- | --- |
 | `working` | The specialist is actively thinking, editing, or running commands. | Leave it alone and re-check after the next `wait_idle`. |
 | `waiting-permission` | The pane stopped on a safe execution approval such as `run this command` or `press enter to continue`. | Auto-proceed once, then `wait_idle` and `capture` again. |
@@ -313,7 +313,7 @@ callbacks too.
 
 ## Start With A Local Plan
 
-The conductor should usually do the first planning pass in the current pane.
+The orchestrator should usually do the first planning pass in the current pane.
 
 Before launching other agents:
 - identify the user outcome
@@ -357,7 +357,7 @@ digraph gaud_mode_decision {
 
 If the answer is `stay single-threaded`, say that explicitly and proceed.
 
-## Conductor Workflow
+## Orchestrator Workflow
 
 ### 1. Do a short grounding pass
 
@@ -460,7 +460,7 @@ Use a compact prompt structure like this:
 Role: [investigator|designer|implementer|reviewer]
 Workstream: [name]
 Goal: [what the user needs]
-Coordinator pane: [session:window.pane]
+Orchestrator pane: [session:window.pane]
 Context:
 - [relevant repo or product context]
 - [constraints]
@@ -469,23 +469,23 @@ Context:
 Autonomy policy:
 - Continue through safe repo exploration, file reads, code edits, and local verification needed for this batch.
 - Skip optional update prompts, release notes, telemetry notices, and other non-essential setup screens when they are not required.
-- If you are unsure what to do next, stop guessing and ask through the conductor.
+- If you are unsure what to do next, stop guessing and ask through the orchestrator.
 
 If an update or setup interruption appears required for the assigned task, or you are not sure whether skipping is safe, escalate instead of guessing.
 
-If you are confused about the requested outcome, do not invent the missing requirement. Ask one targeted question through the conductor.
+If you are confused about the requested outcome, do not invent the missing requirement. Ask one targeted question through the orchestrator.
 
 If you are confused or the request is ambiguous, send:
-- `tmux-cli send "GAUDMODE waiting-user role=[role] workstream=[name] summary=[targeted question]" --pane=[conductor-pane]`
+- `tmux-cli send "GAUDMODE waiting-user role=[role] workstream=[name] summary=[targeted question]" --pane=[orchestrator-pane]`
 
 If you hit a clearly safe execution approval, send:
-- `tmux-cli send "GAUDMODE waiting-permission role=[role] workstream=[name] summary=[short reason]" --pane=[conductor-pane]`
+- `tmux-cli send "GAUDMODE waiting-permission role=[role] workstream=[name] summary=[short reason]" --pane=[orchestrator-pane]`
 
 If you hit a risky or ambiguous approval, send:
-- `tmux-cli send "GAUDMODE waiting-user role=[role] workstream=[name] summary=[short reason]" --pane=[conductor-pane]`
+- `tmux-cli send "GAUDMODE waiting-user role=[role] workstream=[name] summary=[short reason]" --pane=[orchestrator-pane]`
 
 When you finish this batch, send:
-- `tmux-cli send "GAUDMODE done role=[role] workstream=[name] summary=[one-line result]" --pane=[conductor-pane]`
+- `tmux-cli send "GAUDMODE done role=[role] workstream=[name] summary=[one-line result]" --pane=[orchestrator-pane]`
 ```
 
 ### 6. Coordinate with tmux-cli deliberately
@@ -546,7 +546,7 @@ Cleanup rules:
 - prefer graceful exit first for active specialist CLIs
 - close gaud-created specialist panes when they are no longer needed
 - if a gaud-created window becomes empty, close that window too
-- never kill the conductor pane unless the user explicitly asks
+- never kill the orchestrator pane unless the user explicitly asks
 - never kill unrelated pre-existing panes or windows that `gaud-mode` did not
   create
 
@@ -610,13 +610,13 @@ Do not parallelize when:
 ## Check-In Pattern
 
 Use short loops:
-1. conductor defines the next smallest useful tasks
+1. orchestrator defines the next smallest useful tasks
 2. specialists work in parallel
 3. specialists send `GAUDMODE waiting-permission`, `GAUDMODE waiting-user`, or
-   `GAUDMODE done` callbacks when needed; otherwise the conductor uses
+   `GAUDMODE done` callbacks when needed; otherwise the orchestrator uses
    `wait_idle` plus `capture`
-4. conductor evaluates the results
-5. conductor decides the next small batch or starts cleanup
+4. orchestrator evaluates the results
+5. orchestrator decides the next small batch or starts cleanup
 
 ## Quick Reference
 
@@ -664,7 +664,7 @@ When reporting progress, prefer this structure:
 ## Example
 
 For a new onboarding flow:
-- do the first planning pass locally in the conductor pane
+- do the first planning pass locally in the orchestrator pane
 - if `~/.config/gaud.config.jsonl` is missing, offer `init now` or `defaults for
   this run`
 - show the detected-tool summary, config status, and recommended role map first
