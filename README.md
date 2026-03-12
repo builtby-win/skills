@@ -14,6 +14,7 @@ npx playbooks add skill builtby-win/skills --skill gaud-mode
 npx playbooks add skill builtby-win/skills --skill todo
 npx playbooks add skill builtby-win/skills --skill note
 npx playbooks add skill builtby-win/skills --skill blog
+npx playbooks add skill builtby-win/skills --skill things-cli
 ```
 
 Playbooks installs the skill into your agent's skills directory. For Claude
@@ -113,6 +114,7 @@ docs/       # Plans and supporting repo documentation
 - `todo` - add tasks to Beads repositories with project inference
 - `note` - create draft blog posts from project learnings
 - `blog` - manage and publish blog drafts
+- `things-cli` - interact with Things 3 safely from the CLI using `things-cli`, Things URLs, and AppleScript
 
 ### Claude plugin skills
 
@@ -154,6 +156,7 @@ Current standalone skill directories:
 - `skills/todo/`
 - `skills/note/`
 - `skills/blog/`
+- `skills/things-cli/`
 
 `gaud-mode` also carries eval prompts in `skills/gaud-mode/evals/evals.json`.
 

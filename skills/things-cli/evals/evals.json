@@ -1,0 +1,23 @@
+{
+  "skill_name": "things-cli",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Add a task to Things 3 for \"Book dentist appointment\" in the area Health, schedule it for tomorrow at 9am, tag it Health and Admin, and include checklist items call office / confirm insurance / add calendar reminder.",
+      "expected_output": "The agent recognizes this as a create flow, does not misuse `things-cli` for writing, prefers the Things URL scheme, and either emits or runs a correctly encoded add command with checklist items, tags, and reveal behavior.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "Find my Things task about renewing my passport, append notes saying bring old passport and printed photo form, move it into the Errands project, and set a deadline for next Friday.",
+      "expected_output": "The agent uses `things-cli` for search or inspection first, resolves one exact target, then uses Things URL update by ID when possible or a clearly justified AppleScript fallback. It does not guess between multiple matches.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Delete the canceled project called Old Apartment Search from Things 3, but only if it is already in the Logbook or Trash.",
+      "expected_output": "The agent recognizes deletion as an AppleScript workflow, verifies the guard condition before mutating, refuses ambiguous matches, and avoids global `empty trash` behavior.",
+      "files": []
+    }
+  ]
+}
