@@ -119,7 +119,7 @@ $ worktree delete 20
 This CLI is standalone. Use it directly from any git repo once you decide
 isolated worktrees are helpful.
 
-It also pairs well with tmux-based orchestration flows such as `god-mode`, or
+It also pairs well with tmux-based orchestration flows such as `gaud-mode`, or
 with your own superpowers-driven workflow, but it does not depend on any
 repo-owned workflow command.
 

@@ -41,7 +41,7 @@ as repo-owned Playbooks-first skill content under `skills/gaud-mode/`.
 
 ## Gaud Mode Setup
 
-`gaud-mode` is the repo-owned tmux orchestration skill. Before first use:
+`gaud-mode` is the repo-owned tmux milestone-runner orchestration skill. Before first use:
 
 1. Install `gaud-mode` from this repo.
 2. Install the separate `tmux-cli` utility or skill in your agent environment.
@@ -68,30 +68,36 @@ On the first run, if `~/.config/gaud.config.jsonl` does not exist,
 `gaud-mode` should offer to initialize it or use defaults for that run.
 
 Recommended defaults:
-- conductor and first planning pass: this session
-- investigator: `claude`
-- implementer and reviewer: `codex`
-- designer: `gemini`
+- `CEO/PM` conductor and first planning pass: this session
+- `TPM`: `claude`
+- `Investigator`: `claude`
+- `UX/UI`: `gemini`
+- `Implementer`: `codex`
+- `Integrator` / review: `opencode`
+- `Dogfooder`: real humans
 
 If a preferred CLI is missing, `gaud-mode` should report the fallback it is using
 instead of silently swapping providers.
 
 Example fallback message:
-- `Codex not found, so using OpenCode for implementation and code review.`
+- `Codex not found, so using OpenCode for implementation while keeping OpenCode as the Integrator for review.`
 - `Gemini not found, so using Claude for UI design and critique.`
 
 Quick start:
 
 ```text
-Use gaud-mode for this feature. Keep this session as conductor. Use Claude for
-investigation, Codex for implementation and code review, and Gemini for UI.
+Use gaud-mode for this feature. Keep this session as CEO/PM and first-pass
+planner. Run gaud as a milestone runner with Claude as TPM, Claude as
+Investigator, Gemini on UX/UI, Codex implementing, OpenCode integrating and
+reviewing, and real humans dogfooding milestones.
 ```
 
 Shorter version:
 
 ```text
-Use gaud. This session stays conductor. Claude investigates. Codex implements and
-reviews. Gemini handles UI.
+Use gaud. This session stays CEO/PM. Claude is TPM. Claude is Investigator.
+Gemini handles UX/UI. Codex implements. OpenCode integrates and reviews.
+Humans dogfood milestones.
 ```
 
 If you do not specify a map, `gaud-mode` should show the recommended one and ask
@@ -99,7 +105,7 @@ for a quick override before launching panes.
 
 ## Current Repo-Owned Skills
 
-- `gaud-mode` - tmux-based multi-agent conductor workflow
+- `gaud-mode` - tmux-based milestone-runner workflow for multi-agent delivery
 - `todo` - add tasks to Beads repositories with project inference
 - `note` - create draft blog posts from project learnings
 - `blog` - manage and publish blog drafts
