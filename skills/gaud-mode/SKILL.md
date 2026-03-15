@@ -3,6 +3,38 @@ name: gaud-mode
 description: Use when substantial implementation work should be run through tmux as a supervised milestone program, especially when the user asks for gaud-mode, gaud, god-mode, godmode, or god and needs gaud-native personas, milestone gates, init preferences, fallback routing, check-backs, dogfooding, and cleanup.
 ---
 
+## Update Check (run first)
+
+```bash
+_GAUD_DIR=""
+for d in \
+  "$HOME/.claude/skills/gaud-mode" \
+  ".claude/skills/gaud-mode" \
+  "$HOME/.config/opencode/skills/gaud-mode" \
+  ".config/opencode/skills/gaud-mode"
+do
+  if [ -x "$d/bin/gaud-mode-update-check" ]; then
+    _GAUD_DIR="$d"
+    break
+  fi
+done
+_GAUD_UPD=""
+if [ -n "$_GAUD_DIR" ]; then
+  _GAUD_UPD="$("$_GAUD_DIR/bin/gaud-mode-update-check" 2>/dev/null || true)"
+fi
+[ -n "$_GAUD_UPD" ] && printf '%s\n' "$_GAUD_UPD" || true
+```
+
+If output shows `UPGRADE_AVAILABLE <old> <new>`, refresh gaud immediately before any planning, setup, or tmux work. Prefer the normal agent-facing installers:
+- `npx -y skills add builtby-win/skills --skill gaud-mode --yes`
+- `npx -y playbooks add skill builtby-win/skills --skill gaud-mode -y`
+
+Use `"$_GAUD_DIR/bin/gaud-mode-upgrade"` as the wrapper when you want gaud to choose automatically. It should prefer those installer flows because they preserve the normal symlinked install behavior, then fall back to a direct self-refresh path like gstack's raw upgrade flow when those package CLIs are unavailable. Gaud should refresh itself first, then continue the invocation on the updated copy.
+
+If output shows `JUST_UPGRADED <from> <to>`, tell the user `Running gaud-mode v{to} (just updated)` and continue.
+
+If auto-refresh fails because the network is down, the install cannot be refreshed safely, the current copy is a repo source checkout, or the direct fallback cannot replace the installed copy, surface that clearly instead of silently using a stale copy.
+
 # Gaud Mode
 
 ## Overview
@@ -23,6 +55,7 @@ check-backs, and milestone acceptance gates before the next milestone starts.
 
 Keep gaud as a supervised program runner:
 - current session stays the `CEO/PM` conductor unless the user overrides it
+- every invocation runs the bundled update check first and refreshes gaud before orchestration when a newer version exists
 - ticketing waits until the markdown plan has explicit `program DONE criteria`
   and current `milestone DONE criteria`
 - specialists work only on the current milestone in small tasks
@@ -58,6 +91,24 @@ If the user says any of these, treat them as the same intent:
 
 If the user says `gaud-mode init`, `gaud init`, `god-mode init`, `godmode init`,
 or `god init`, switch into setup mode before launching specialists.
+
+## Update Mistakes
+
+| Rationalization | Required response |
+| --- | --- |
+| `I already loaded gaud-mode earlier.` | Run the update check again. Gaud refreshes per invocation, not once per session. |
+| `This run is urgent; I can update after launch.` | Refresh first, then plan and launch panes. |
+| `The installed copy is probably close enough.` | Treat the local copy as stale until the bundled check says otherwise. |
+| `Updating through npx is unnecessary; I should patch files manually.` | Prefer `npx skills` or `npx playbooks` so the installed skill stays consistent with the published package. |
+| `The package CLIs are missing, so gaud cannot refresh at all.` | Fall back to the direct self-refresh path before giving up. |
+| `This source checkout under skills/gaud-mode should auto-upgrade itself.` | Treat repo source trees as development copies, not installed skill targets. |
+
+Red flags:
+- `skip the update check just this once`
+- `use the loaded copy and refresh later`
+- `skip the installer and edit the installed copy by hand`
+
+All of these mean: stop and refresh `gaud-mode` before orchestration, or report that auto-refresh is blocked.
 
 ## Role Map
 
@@ -204,7 +255,8 @@ See `skills/gaud-mode/references/milestone-loop.md` and
 
 Treat tmux windows as capacity buckets and keep at most three total panes in one
 window. Track pane and window ownership so gaud only cleans up resources it
-created.
+created, and remove cleaned-up specialist panes from the registry immediately so
+gaud never keeps routing work to a closed agent entry.
 
 Use direct launch prefixes, not the old `env` wrapper form:
 
@@ -214,6 +266,11 @@ B2V_DISABLED=true codex --yolo "<kickoff prompt>"
 B2V_DISABLED=true gemini --yolo -i "<kickoff prompt>"
 B2V_DISABLED=true opencode --prompt "<kickoff prompt>"
 ```
+
+For OpenCode, keep using the long-lived `--prompt` launch form for gaud
+specialist panes. `opencode run "<kickoff prompt>"` is a one-shot command and
+exits after answering, so it is not the default launch form when gaud expects to
+send follow-up work into the same pane with `tmux-cli send`.
 
 Use `tmux-cli send` for prompts, `tmux-cli wait_idle` before reading a pane, and
 `tmux-cli capture` to inspect the result.
@@ -250,6 +307,15 @@ Keep relaunch behavior bounded:
 At launch time, gaud records the conductor pane ID for the current run. Treat
 that pane as the callback target for all specialist check-backs.
 
+Cleanup and unregister rules:
+- after an accepted milestone, close the gaud-created specialist panes for that
+  milestone and remove their registry entries before launching fresh specialists
+- after full program completion or cancellation, close every remaining
+  gaud-created specialist pane, unregister each closed pane, and then clean up
+  any empty gaud-created windows
+- never leave a closed, retired, or finished specialist registered as an active
+  routing target
+
 Prefer explicit callbacks with `GAUDMODE` and accept legacy `GODMODE` during
 migration:
 - `GAUDMODE waiting-permission role=[role] milestone=[current milestone] workstream=[name] summary=[reason]`
@@ -280,6 +346,7 @@ approvals to the user.
 - do not preserve stale specialist context across accepted milestones
 - do not force dogfooding on internal-only milestones that are not user-testable
 - do not keep specialists running long after the current milestone is accepted
+- do not leave finished or closed specialists registered after cleanup
 - do not one-shot large programs without milestone check-backs
 - do not auto-approve deploys, billing changes, credential access, auth changes,
   destructive git or file actions, production data operations, or unrelated
@@ -304,15 +371,16 @@ approvals to the user.
 
 | Situation | What to do |
 | --- | --- |
+| Any new gaud invocation starts | Run the bundled update check first and auto-refresh gaud with `npx skills` or `npx playbooks`, then fall back to direct self-refresh if those package CLIs are unavailable. |
 | User says `gaud`, `god`, `godmode`, or `god-mode` | Use the canonical `gaud-mode` skill. |
 | First run and no global config exists | Offer init or defaults for this run with one short setup question. |
 | Role map is unclear | Show detected tools, merged defaults, and the actual role map once fallbacks apply. |
 | Markdown plan lacks `program DONE criteria` or current `milestone DONE criteria` | Stop and fix the plan before ticketing. |
 | About to send work to a specialist pane | Run the before-send liveness check first; relaunch and update the registry if the pane is stale, dead, closed, or canceled. |
 | Current milestone is user-testable | stop for dogfooding before the next milestone |
-| Current milestone is accepted | check back, retire the specialist panes for that milestone, and relaunch fresh specialists for the next milestone |
+| Current milestone is accepted | check back, close and unregister the specialist panes for that milestone, and relaunch fresh specialists for the next milestone |
 | Provider is blocked | Reroute explicitly before launch. |
-| Work is complete | Clean up gaud-created panes and any empty gaud-created windows. |
+| Work is complete | Close and unregister gaud-created specialist panes, then clean up any empty gaud-created windows. |
 
 Gaud is a milestone runner. Keep tasks small, check back often, use fresh
 specialists after accepted milestones, do not one-shot the program, and keep

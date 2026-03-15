@@ -55,6 +55,11 @@ command -v tmux tmux-cli claude opencode codex gemini
 `gaud-mode` should explicitly detect installed specialist CLIs, report what is
 missing, show a recommended role map, and let the user override it.
 
+Every invocation should also run `skills/gaud-mode/bin/gaud-mode-update-check`
+first and refresh the installed skill from `builtby-win/skills` before gaud
+starts orchestration when a newer version exists, preferably via `npx skills`
+or `npx playbooks` rather than hand-editing the installed copy.
+
 Canonical skill name:
 - `gaud-mode`
 

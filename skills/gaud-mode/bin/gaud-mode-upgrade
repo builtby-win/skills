@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_DIR="${GAUD_MODE_STATE_DIR:-$HOME/.gaud-mode}"
+MARKER_FILE="$STATE_DIR/just-upgraded-from"
+VERSION_FILE="${GAUD_MODE_VERSION_FILE:-}"
+
+if [ -z "$VERSION_FILE" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+  VERSION_FILE="$SKILL_DIR/VERSION"
+fi
+
+SKILL_DIR="$(cd "$(dirname "$VERSION_FILE")" && pwd)"
+REMOTE_REPO_URL="${GAUD_MODE_REPO_URL:-https://github.com/builtby-win/skills.git}"
+REMOTE_BRANCH="${GAUD_MODE_REMOTE_BRANCH:-main}"
+
+is_repo_source_checkout() {
+  case "$SKILL_DIR" in
+    */builtby.win/skills/skills/gaud-mode|*/skills/skills/gaud-mode)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+INSTALL_SCOPE=""
+case "${GAUD_MODE_INSTALL_SCOPE:-auto}" in
+  global)
+    INSTALL_SCOPE="--global"
+    ;;
+  project)
+    INSTALL_SCOPE=""
+    ;;
+  auto)
+    case "$VERSION_FILE" in
+      "$HOME/.claude/skills/"*|"$HOME/.config/opencode/skills/"*)
+        INSTALL_SCOPE="--global"
+        ;;
+      *)
+        INSTALL_SCOPE=""
+        ;;
+    esac
+    ;;
+esac
+
+OLD_VERSION="unknown"
+if [ -f "$VERSION_FILE" ]; then
+  OLD_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null || true)"
+  [ -n "$OLD_VERSION" ] || OLD_VERSION="unknown"
+fi
+
+upgrade_with_skills() {
+  if [ -n "$INSTALL_SCOPE" ]; then
+    npx -y skills add builtby-win/skills --skill gaud-mode --yes "$INSTALL_SCOPE"
+  else
+    npx -y skills add builtby-win/skills --skill gaud-mode --yes
+  fi
+}
+
+upgrade_with_playbooks() {
+  if [ -n "$INSTALL_SCOPE" ]; then
+    npx -y playbooks add skill builtby-win/skills --skill gaud-mode -y "$INSTALL_SCOPE"
+  else
+    npx -y playbooks add skill builtby-win/skills --skill gaud-mode -y
+  fi
+}
+
+upgrade_direct() {
+  local repo_root remote_url tmp_dir backup_dir
+
+  if is_repo_source_checkout; then
+    printf 'gaud-mode direct upgrade skipped: repo source checkout is not an installed skill target\n' >&2
+    return 1
+  fi
+
+  repo_root="$(git -C "$SKILL_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+  remote_url="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
+
+  case "$remote_url" in
+    *builtby-win/skills* )
+      git -C "$repo_root" pull --ff-only origin "$REMOTE_BRANCH"
+      return 0
+      ;;
+  esac
+
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "$tmp_dir"' RETURN
+  git clone --depth 1 --branch "$REMOTE_BRANCH" "$REMOTE_REPO_URL" "$tmp_dir/repo" >/dev/null 2>&1
+
+  if [ ! -d "$tmp_dir/repo/skills/gaud-mode" ]; then
+    printf 'gaud-mode direct upgrade source is missing skills/gaud-mode\n' >&2
+    return 1
+  fi
+
+  if ! command -v rsync >/dev/null 2>&1; then
+    printf 'gaud-mode direct upgrade requires rsync when package installers are unavailable\n' >&2
+    return 1
+  fi
+
+  mkdir -p "$STATE_DIR/backups"
+  backup_dir="$STATE_DIR/backups/gaud-mode-$(date +%Y%m%d%H%M%S)"
+  mkdir -p "$backup_dir"
+  cp -R "$SKILL_DIR/." "$backup_dir/"
+  rsync -a --delete "$tmp_dir/repo/skills/gaud-mode/" "$SKILL_DIR/"
+}
+
+if npx -y skills --help >/dev/null 2>&1; then
+  upgrade_with_skills
+elif npx -y playbooks --help >/dev/null 2>&1; then
+  upgrade_with_playbooks
+else
+  upgrade_direct
+fi
+
+NEW_VERSION="$OLD_VERSION"
+if [ -f "$VERSION_FILE" ]; then
+  NEW_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null || true)"
+  [ -n "$NEW_VERSION" ] || NEW_VERSION="$OLD_VERSION"
+fi
+
+mkdir -p "$STATE_DIR"
+printf '%s\n' "$OLD_VERSION" > "$MARKER_FILE"
+printf 'JUST_UPGRADED %s %s\n' "$OLD_VERSION" "$NEW_VERSION"
