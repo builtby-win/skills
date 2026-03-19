@@ -78,6 +78,7 @@ plan.
 ## tmux Operating Notes
 
 - Keep a registry of which panes and windows gaud created.
+- Remove registry entries immediately when gaud retires or closes those panes.
 - Before `tmux-cli send` to any specialist, verify the target pane is still alive
   and still hosts the expected specialist in a usable state.
 - Treat a pane as stale/dead if tmux reports it closed, the agent was canceled,
@@ -90,4 +91,4 @@ plan.
   conductor-level blocker instead of retrying forever.
 - Use callbacks plus `wait_idle` and `capture` to monitor progress.
 - Clean up gaud-created specialist panes after acceptance, cancellation, or full
-  completion.
+  completion, and unregister those panes as part of the same cleanup step.

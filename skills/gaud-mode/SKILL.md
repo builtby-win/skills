@@ -272,8 +272,7 @@ specialist panes. `opencode run "<kickoff prompt>"` is a one-shot command and
 exits after answering, so it is not the default launch form when gaud expects to
 send follow-up work into the same pane with `tmux-cli send`.
 
-Use `tmux-cli send` for prompts, `tmux-cli wait_idle` before reading a pane, and
-`tmux-cli capture` to inspect the result.
+Use `tmux-cli send` for prompts, `tmux-cli wait_idle --timeout <seconds>` before reading a pane, and `tmux-cli capture` to inspect the result. Always pass a timeout to `wait_idle` so gaud never blocks indefinitely waiting for a specialist.
 
 Before every `tmux-cli send` to a specialist, run a before-send liveness check.
 Do not assume a recorded pane is still usable just because it existed earlier in
@@ -329,8 +328,11 @@ Callback meaning:
   user decisions that should not be auto-proceeded
 
 Transport contract:
-- gaud records the conductor pane ID before launching specialists
-- specialists send callbacks back to the conductor pane with `tmux-cli send "GAUDMODE ..." --pane=<conductor-pane>`
+- at launch, gaud captures its own current pane ID with `tmux display-message -p '#{pane_id}'` and records that as the conductor pane for the run
+- when delegating, the dispatching pane injects its own recorded conductor pane ID into the specialist kickoff — never send a literal placeholder
+- every kickoff prompt must include the assigned role explicitly (e.g. `role=Implementer`) so the specialist knows its identity from the first message
+- specialists send callbacks back to the injected conductor pane with `tmux-cli send "GAUDMODE ..." --pane=<conductor-pane-id>`
+- when polling for a callback, use `tmux-cli wait_idle --timeout <seconds> --pane=<conductor-pane-id>` then `tmux-cli capture --pane=<conductor-pane-id>` — never wait without a timeout
 - keep the milestone-aware payload shape above unchanged inside that send command
 - continue recognizing legacy `GODMODE ...` callbacks during migration
 

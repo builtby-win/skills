@@ -50,6 +50,7 @@ Do not start the next milestone until that decision is made.
 ## Fresh Context After Acceptance
 
 When a user-testable milestone is accepted:
-- clean up the gaud-created specialist panes for that milestone
+- clean up the gaud-created specialist panes for that milestone and unregister
+  their registry entries
 - keep only the conductor stable
 - launch fresh specialists for the next milestone with the updated plan context

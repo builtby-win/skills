@@ -9,16 +9,21 @@ and callback footer below. The relaunched pane replaces the old registry entry.
 
 ## Shared Callback Footer
 
-Append this footer, or equivalent language, to every specialist kickoff prompt:
+Append this footer, or equivalent language, to every specialist kickoff prompt.
+Before sending, replace `CONDUCTOR_PANE_ID` with the pane ID gaud captured from
+its own session at launch (`tmux display-message -p '#{pane_id}'`), and replace
+`ASSIGNED_ROLE` with the role being dispatched (e.g. `Implementer`). Never send
+literal placeholders.
 
 ```text
+You are role=ASSIGNED_ROLE for this milestone.
 Stay inside the current milestone and named workstream only.
-Gaud records the conductor pane ID for this run.
-Send every callback back to that pane with tmux-cli send "GAUDMODE ..." --pane=<conductor-pane>.
+Send every callback back to the conductor pane with:
+  tmux-cli send "GAUDMODE ..." --pane=CONDUCTOR_PANE_ID
 Use callbacks with milestone and workstream context:
-- GAUDMODE done role=<role> milestone=<current milestone> workstream=<name> summary=<result>
-- GAUDMODE waiting-user role=<role> milestone=<current milestone> workstream=<name> summary=<question or blocker>
-- GAUDMODE waiting-permission role=<role> milestone=<current milestone> workstream=<name> summary=<permission needed>
+- GAUDMODE done role=ASSIGNED_ROLE milestone=<current milestone> workstream=<name> summary=<result>
+- GAUDMODE waiting-user role=ASSIGNED_ROLE milestone=<current milestone> workstream=<name> summary=<question or blocker>
+- GAUDMODE waiting-permission role=ASSIGNED_ROLE milestone=<current milestone> workstream=<name> summary=<permission needed>
 Use waiting-user for product ambiguity, external decisions, or when the user must choose.
 Use waiting-permission for clearly safe execution approvals that gaud may inspect and auto-proceed once.
 Use done only when your scoped work for this milestone/workstream is complete.
@@ -98,3 +103,7 @@ B2V_DISABLED=true codex --yolo "<prompt>"
 B2V_DISABLED=true gemini --yolo -i "<prompt>"
 B2V_DISABLED=true opencode --prompt "<prompt>"
 ```
+
+For gaud specialist panes, keep OpenCode on `--prompt` so the pane stays alive
+for later `tmux-cli send` follow-ups. `opencode run "<prompt>"` is a one-shot
+command and is not the default persistent-pane launch form.
