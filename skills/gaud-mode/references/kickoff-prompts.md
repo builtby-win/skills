@@ -81,6 +81,9 @@ Implement one small current ticket only.
 Run local verification for that ticket.
 Check back at ticket completion. Use waiting-user for product ambiguity and
 waiting-permission for clearly safe execution approvals that gaud may inspect.
+If you hit any error you cannot immediately resolve, do not decide how to handle
+it on your own. Send a waiting-user callback immediately with the error details
+so the conductor and user can decide what to do.
 ```
 
 ## Integrator
@@ -103,6 +106,8 @@ B2V_DISABLED=true codex --yolo "<prompt>"
 B2V_DISABLED=true gemini --yolo -i "<prompt>"
 B2V_DISABLED=true opencode --prompt "<prompt>"
 ```
+
+Never use `codex exec` or pipe a prompt via stdin (e.g. `codex exec -m ... --full-auto -`). That is a fire-and-forget one-shot mode — it exits immediately, cannot receive follow-up `tmux-cli send` messages, and breaks the callback protocol. Always use `codex --yolo "<prompt>"` so the pane stays alive for the full milestone.
 
 For gaud specialist panes, keep OpenCode on `--prompt` so the pane stays alive
 for later `tmux-cli send` follow-ups. `opencode run "<prompt>"` is a one-shot

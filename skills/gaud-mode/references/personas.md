@@ -55,9 +55,11 @@
 - Ownership boundary: scoped edits, local verification, and ticket-level
   execution.
 - Stop conditions: stop at ticket completion, when blocked on unclear product
-  intent, or when the next ticket belongs to a new milestone.
+  intent, when an error occurs that cannot be immediately resolved, or when the
+  next ticket belongs to a new milestone.
 - Callback behavior: send `GAUDMODE done` with the ticket result,
-  `GAUDMODE waiting-user` for product ambiguity or user decisions, or
+  `GAUDMODE waiting-user` for product ambiguity, user decisions, or any error
+  that needs a decision (never self-decide how to handle errors), or
   `GAUDMODE waiting-permission` for clearly safe execution approvals that gaud
   may inspect and auto-proceed once.
 - Default provider bias: Codex.

@@ -267,6 +267,8 @@ B2V_DISABLED=true gemini --yolo -i "<kickoff prompt>"
 B2V_DISABLED=true opencode --prompt "<kickoff prompt>"
 ```
 
+Never use `codex exec` or pipe a prompt via stdin (e.g. `codex exec -m ... --full-auto -`). That is a fire-and-forget one-shot mode — it exits immediately, cannot receive follow-up `tmux-cli send` messages, and breaks the callback protocol. Always use `codex --yolo "<prompt>"` so the pane stays alive for the full milestone.
+
 For OpenCode, keep using the long-lived `--prompt` launch form for gaud
 specialist panes. `opencode run "<kickoff prompt>"` is a one-shot command and
 exits after answering, so it is not the default launch form when gaud expects to
@@ -345,6 +347,8 @@ approvals to the user.
   provider-health preflight, callback protocol, cleanup rules, or tmux awareness
 - do not let ticketing begin before `program DONE criteria` and current
   `milestone DONE criteria` are explicit
+- do not let a specialist self-decide how to handle an error; surface all errors
+  to the user via `waiting-user` so the conductor and user can decide
 - do not preserve stale specialist context across accepted milestones
 - do not force dogfooding on internal-only milestones that are not user-testable
 - do not keep specialists running long after the current milestone is accepted
@@ -379,6 +383,8 @@ approvals to the user.
 | Role map is unclear | Show detected tools, merged defaults, and the actual role map once fallbacks apply. |
 | Markdown plan lacks `program DONE criteria` or current `milestone DONE criteria` | Stop and fix the plan before ticketing. |
 | About to send work to a specialist pane | Run the before-send liveness check first; relaunch and update the registry if the pane is stale, dead, closed, or canceled. |
+| A specialist hits an error it cannot immediately resolve | Specialist must send `waiting-user` with the error details immediately; never self-decide how to handle it. |
+| Launching a Codex specialist | Use `codex --yolo "<prompt>"`. Never use `codex exec` or stdin piping — that is fire-and-forget and breaks the callback protocol. |
 | Current milestone is user-testable | stop for dogfooding before the next milestone |
 | Current milestone is accepted | check back, close and unregister the specialist panes for that milestone, and relaunch fresh specialists for the next milestone |
 | Provider is blocked | Reroute explicitly before launch. |
