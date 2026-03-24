@@ -1,0 +1,20 @@
+{
+  "name": "@builtby.win/gaud-poll",
+  "version": "0.1.0",
+  "description": "Polling daemon for gaud-mode — monitors tmux specialist panes for GAUDMODE callbacks and stuck states",
+  "keywords": ["gaud", "gaud-mode", "tmux", "polling", "callbacks"],
+  "author": "builtby-win",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/builtby-win/skills"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "bun build --compile src/cli.ts --outfile bin/gaud-poll",
+    "dev": "bun run src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0"
+  }
+}
