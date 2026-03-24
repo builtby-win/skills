@@ -267,6 +267,17 @@ B2V_DISABLED=true gemini --yolo -i "<kickoff prompt>"
 B2V_DISABLED=true opencode --prompt "<kickoff prompt>"
 ```
 
+When the user says "use gaud with X, Y, Z agent to implement" (or any phrasing
+that names specific agents alongside a gaud invocation), always launch every
+named agent with all permission-skip flags so no approval prompts interrupt the
+run:
+- `claude`: `--dangerously-skip-permissions`
+- `codex`: `--yolo`
+- `gemini`: `--yolo`
+- `opencode`: no extra flag needed (non-interactive by default with `--prompt`)
+
+Apply this automatically — do not ask the user to confirm the flags.
+
 Never use `codex exec` or pipe a prompt via stdin (e.g. `codex exec -m ... --full-auto -`). That is a fire-and-forget one-shot mode — it exits immediately, cannot receive follow-up `tmux-cli send` messages, and breaks the callback protocol. Always use `codex --yolo "<prompt>"` so the pane stays alive for the full milestone.
 
 For OpenCode, keep using the long-lived `--prompt` launch form for gaud
@@ -275,6 +286,10 @@ exits after answering, so it is not the default launch form when gaud expects to
 send follow-up work into the same pane with `tmux-cli send`.
 
 Use `tmux-cli send` for prompts, `tmux-cli wait_idle --timeout <seconds>` before reading a pane, and `tmux-cli capture` to inspect the result. Always pass a timeout to `wait_idle` so gaud never blocks indefinitely waiting for a specialist.
+
+Every `tmux-cli send` to any pane — including the conductor/orchestrator pane — must end with an explicit Enter keystroke so the command actually runs. Do not assume the pane will execute input without it. After sending a callback or task to the orchestrator pane, always confirm Enter was sent.
+
+Do not rely solely on specialist callbacks to drive the milestone loop. The orchestrator must also poll specialist panes periodically (e.g. every 30–60 seconds) using `tmux-cli capture` to check for completion or stuck states. Callbacks can flake if the specialist sends the `tmux-cli send` but the Enter keystroke is missing or dropped — polling catches those cases.
 
 Before every `tmux-cli send` to a specialist, run a before-send liveness check.
 Do not assume a recorded pane is still usable just because it existed earlier in
@@ -385,6 +400,9 @@ approvals to the user.
 | About to send work to a specialist pane | Run the before-send liveness check first; relaunch and update the registry if the pane is stale, dead, closed, or canceled. |
 | A specialist hits an error it cannot immediately resolve | Specialist must send `waiting-user` with the error details immediately; never self-decide how to handle it. |
 | Launching a Codex specialist | Use `codex --yolo "<prompt>"`. Never use `codex exec` or stdin piping — that is fire-and-forget and breaks the callback protocol. |
+| User says "use gaud with X agent to implement" | Always launch every named agent with all permission-skip flags (`--yolo`, `--dangerously-skip-permissions`, etc.) — no approval prompts. |
+| Sending any `tmux-cli send` to any pane | Always end with an explicit Enter keystroke so the input actually executes. Never assume the pane runs it without Enter. |
+| Waiting for specialist callbacks | Also poll specialist panes periodically with `tmux-cli capture` — callbacks can flake if Enter was not sent; polling catches stuck panes. |
 | Current milestone is user-testable | stop for dogfooding before the next milestone |
 | Current milestone is accepted | check back, close and unregister the specialist panes for that milestone, and relaunch fresh specialists for the next milestone |
 | Provider is blocked | Reroute explicitly before launch. |

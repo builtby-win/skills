@@ -20,6 +20,9 @@ You are role=ASSIGNED_ROLE for this milestone.
 Stay inside the current milestone and named workstream only.
 Send every callback back to the conductor pane with:
   tmux-cli send "GAUDMODE ..." --pane=CONDUCTOR_PANE_ID
+Always ensure Enter is sent after the tmux-cli send command so the conductor
+pane actually receives and executes the callback — do not just send keystrokes
+without confirming Enter is delivered.
 Use callbacks with milestone and workstream context:
 - GAUDMODE done role=ASSIGNED_ROLE milestone=<current milestone> workstream=<name> summary=<result>
 - GAUDMODE waiting-user role=ASSIGNED_ROLE milestone=<current milestone> workstream=<name> summary=<question or blocker>
@@ -107,8 +110,18 @@ B2V_DISABLED=true gemini --yolo -i "<prompt>"
 B2V_DISABLED=true opencode --prompt "<prompt>"
 ```
 
+When the user says "use gaud with X, Y, Z agent to implement", always apply all
+permission-skip flags for every named agent (`--yolo`, `--dangerously-skip-permissions`,
+etc.) so no approval prompts interrupt the run.
+
 Never use `codex exec` or pipe a prompt via stdin (e.g. `codex exec -m ... --full-auto -`). That is a fire-and-forget one-shot mode — it exits immediately, cannot receive follow-up `tmux-cli send` messages, and breaks the callback protocol. Always use `codex --yolo "<prompt>"` so the pane stays alive for the full milestone.
 
 For gaud specialist panes, keep OpenCode on `--prompt` so the pane stays alive
 for later `tmux-cli send` follow-ups. `opencode run "<prompt>"` is a one-shot
 command and is not the default persistent-pane launch form.
+
+Every `tmux-cli send` to any pane — including the orchestrator/conductor pane —
+must end with an explicit Enter keystroke so the input actually executes. The
+orchestrator must also poll specialist panes periodically (every 30–60 s) with
+`tmux-cli capture` rather than relying solely on callbacks, because callbacks
+can flake when the specialist's `tmux-cli send` runs but Enter is not delivered.
