@@ -107,6 +107,28 @@ upgrade_direct() {
   rsync -a --delete "$tmp_dir/repo/skills/gaud-mode/" "$SKILL_DIR/"
 }
 
+install_gaud_poll() {
+  local install_script
+
+  install_script="$SKILL_DIR/bin/gaud-poll-install"
+  if [ ! -x "$install_script" ]; then
+    printf 'gaud-mode upgrade warning: gaud-poll-install not found after upgrade; shell polling fallback remains available\n' >&2
+    return 0
+  fi
+
+  if "$install_script" --force; then
+    return 0
+  fi
+
+  if ! command -v bun >/dev/null 2>&1; then
+    printf 'gaud-mode upgrade warning: gaud-poll requires bun to build; using shell polling fallback until bun is installed\n' >&2
+    return 0
+  fi
+
+  printf 'gaud-mode upgrade warning: gaud-poll install failed; using shell polling fallback for now\n' >&2
+  return 0
+}
+
 if npx -y skills --help >/dev/null 2>&1; then
   upgrade_with_skills
 elif npx -y playbooks --help >/dev/null 2>&1; then
@@ -114,6 +136,8 @@ elif npx -y playbooks --help >/dev/null 2>&1; then
 else
   upgrade_direct
 fi
+
+install_gaud_poll
 
 NEW_VERSION="$OLD_VERSION"
 if [ -f "$VERSION_FILE" ]; then

@@ -4,6 +4,19 @@
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FORCE_REBUILD=0
+
+case "${1:-}" in
+  --force)
+    FORCE_REBUILD=1
+    ;;
+  "")
+    ;;
+  *)
+    echo "ERROR: unknown argument: ${1}" >&2
+    exit 1
+    ;;
+esac
 
 # Resolve package dir: works whether installed under skills/ or packages/
 # Installed path:  ~/.claude/skills/gaud-mode  → look for sibling gaud-poll package
@@ -30,14 +43,22 @@ PKG_DIR="$(find_package_dir)" || {
 
 BIN="$PKG_DIR/bin/gaud-poll"
 
-if [ -x "$BIN" ]; then
+if [ "$FORCE_REBUILD" -eq 1 ] && [ -e "$BIN" ]; then
+  rm -f "$BIN"
+fi
+
+if [ "$FORCE_REBUILD" -eq 0 ] && [ -x "$BIN" ]; then
   echo "gaud-poll already built at $BIN"
 else
   if ! command -v bun >/dev/null 2>&1; then
     echo "ERROR: bun is required to build gaud-poll. Install from https://bun.sh" >&2
     exit 1
   fi
-  echo "Building gaud-poll..."
+  if [ "$FORCE_REBUILD" -eq 1 ]; then
+    echo "Rebuilding gaud-poll..."
+  else
+    echo "Building gaud-poll..."
+  fi
   (cd "$PKG_DIR" && bun install --frozen-lockfile && bun run build)
   echo "Built: $BIN"
 fi

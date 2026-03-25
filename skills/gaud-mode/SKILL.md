@@ -29,7 +29,7 @@ If output shows `UPGRADE_AVAILABLE <old> <new>`, refresh gaud immediately before
 - `npx -y skills add builtby-win/skills --skill gaud-mode --yes`
 - `npx -y playbooks add skill builtby-win/skills --skill gaud-mode -y`
 
-Use `"$_GAUD_DIR/bin/gaud-mode-upgrade"` as the wrapper when you want gaud to choose automatically. It should prefer those installer flows because they preserve the normal symlinked install behavior, then fall back to a direct self-refresh path like gstack's raw upgrade flow when those package CLIs are unavailable. Gaud should refresh itself first, then continue the invocation on the updated copy.
+Use `"$_GAUD_DIR/bin/gaud-mode-upgrade"` as the wrapper when you want gaud to choose automatically. It should prefer those installer flows because they preserve the normal symlinked install behavior, then fall back to a direct self-refresh path like gstack's raw upgrade flow when those package CLIs are unavailable. After the skill refresh succeeds, it should eagerly run `gaud-poll-install --force` so the companion poller binary is rebuilt and relinked for the new version before gaud continues on the updated copy.
 
 If output shows `JUST_UPGRADED <from> <to>`, tell the user `Running gaud-mode v{to} (just updated)` and continue.
 
@@ -160,7 +160,7 @@ command -v tmux tmux-cli claude opencode codex gemini
 command -v gaud-poll
 ```
 
-If `gaud-poll` is missing or not executable, build and install it automatically:
+On successful `gaud-mode` upgrade, eagerly rebuild and relink `gaud-poll` so the companion binary matches the updated skill. At invocation time, if `gaud-poll` is still missing or not executable, build and install it automatically as a lazy fallback:
 
 ```bash
 # Find and run the install script bundled with this skill
@@ -187,7 +187,7 @@ fi
 If the install script fails because `bun` is missing, tell the user:
 > `gaud-poll requires bun to build. Install bun from https://bun.sh, then re-run gaud-poll-install.`
 
-If the user declines or bun is unavailable, gaud-poll is optional — fall back to the built-in shell polling loop described in the Launch And Callback Essentials section.
+If the eager upgrade-time install or the lazy invocation-time fallback cannot build `gaud-poll`, gaud-poll is optional — warn clearly and fall back to the built-in shell polling loop described in the Launch And Callback Essentials section.
 
 Persist preferences in JSONL:
 - global defaults: `~/.config/gaud.config.jsonl`
