@@ -157,7 +157,37 @@ Check availability explicitly:
 
 ```bash
 command -v tmux tmux-cli claude opencode codex gemini
+command -v gaud-poll
 ```
+
+If `gaud-poll` is missing or not executable, build and install it automatically:
+
+```bash
+# Find and run the install script bundled with this skill
+_GAUD_DIR=""
+for d in \
+  "$HOME/.claude/skills/gaud-mode" \
+  ".claude/skills/gaud-mode" \
+  "$HOME/.config/opencode/skills/gaud-mode" \
+  ".config/opencode/skills/gaud-mode"
+do
+  if [ -x "$d/bin/gaud-poll-install" ]; then
+    _GAUD_DIR="$d"
+    break
+  fi
+done
+
+if [ -n "$_GAUD_DIR" ]; then
+  "$_GAUD_DIR/bin/gaud-poll-install"
+else
+  echo "gaud-poll-install not found — install gaud-mode first"
+fi
+```
+
+If the install script fails because `bun` is missing, tell the user:
+> `gaud-poll requires bun to build. Install bun from https://bun.sh, then re-run gaud-poll-install.`
+
+If the user declines or bun is unavailable, gaud-poll is optional — fall back to the built-in shell polling loop described in the Launch And Callback Essentials section.
 
 Persist preferences in JSONL:
 - global defaults: `~/.config/gaud.config.jsonl`
@@ -289,7 +319,32 @@ Use `tmux-cli send` for prompts, `tmux-cli wait_idle --timeout <seconds>` before
 
 Every `tmux-cli send` to any pane — including the conductor/orchestrator pane — must end with an explicit Enter keystroke so the command actually runs. Do not assume the pane will execute input without it. After sending a callback or task to the orchestrator pane, always confirm Enter was sent.
 
-Do not rely solely on specialist callbacks to drive the milestone loop. The orchestrator must also poll specialist panes periodically (e.g. every 30–60 seconds) using `tmux-cli capture` to check for completion or stuck states. Callbacks can flake if the specialist sends the `tmux-cli send` but the Enter keystroke is missing or dropped — polling catches those cases.
+Do not rely solely on specialist callbacks to drive the milestone loop. Always run a background poller alongside specialists so stuck or silent panes are caught. Two paths — use whichever is available:
+
+**Path 1 — gaud-poll (preferred):** Launch gaud-poll in a background tmux pane at the start of each milestone with all specialist pane IDs and the conductor pane ID. It polls continuously, detects `GAUDMODE` callbacks and stuck/dead panes, and forwards events to the conductor automatically. No manual polling needed.
+
+```bash
+gaud-poll watch -c CONDUCTOR_PANE_ID -p PANE_ID:ROLE:CLI -p PANE_ID:ROLE:CLI -i 30
+```
+
+**Path 2 — shell fallback (when gaud-poll is unavailable):** Launch a background polling loop in a subshell or separate pane. It sleeps, captures each specialist pane, checks for a `GAUDMODE` line, and forwards it to the conductor. Keep looping until all specialists have reported done or the milestone is accepted.
+
+```bash
+(
+  while true; do
+    sleep 30
+    for PANE in SPECIALIST_PANES; do
+      OUT="$(tmux-cli capture --pane="$PANE" 2>/dev/null | tail -50)"
+      if echo "$OUT" | grep -q "GAUDMODE"; then
+        LINE="$(echo "$OUT" | grep "GAUDMODE" | tail -1)"
+        tmux-cli send "$LINE" --pane=CONDUCTOR_PANE_ID
+      fi
+    done
+  done
+) &
+```
+
+Replace `SPECIALIST_PANES`, `CONDUCTOR_PANE_ID` with real values before launching. Kill the background loop once the milestone is accepted.
 
 Before every `tmux-cli send` to a specialist, run a before-send liveness check.
 Do not assume a recorded pane is still usable just because it existed earlier in
@@ -393,6 +448,8 @@ approvals to the user.
 | Situation | What to do |
 | --- | --- |
 | Any new gaud invocation starts | Run the bundled update check first and auto-refresh gaud with `npx skills` or `npx playbooks`, then fall back to direct self-refresh if those package CLIs are unavailable. |
+| `gaud-poll` is missing or not executable | Try `gaud-poll-install` to build it. If bun is missing or the user declines, use the shell fallback polling loop instead — gaud-poll is preferred but optional. |
+| Waiting for specialist callbacks | Launch gaud-poll (path 1) or the shell fallback loop (path 2) in the background at milestone start — never rely on callbacks alone. |
 | User says `gaud`, `god`, `godmode`, or `god-mode` | Use the canonical `gaud-mode` skill. |
 | First run and no global config exists | Offer init or defaults for this run with one short setup question. |
 | Role map is unclear | Show detected tools, merged defaults, and the actual role map once fallbacks apply. |
@@ -402,7 +459,6 @@ approvals to the user.
 | Launching a Codex specialist | Use `codex --yolo "<prompt>"`. Never use `codex exec` or stdin piping — that is fire-and-forget and breaks the callback protocol. |
 | User says "use gaud with X agent to implement" | Always launch every named agent with all permission-skip flags (`--yolo`, `--dangerously-skip-permissions`, etc.) — no approval prompts. |
 | Sending any `tmux-cli send` to any pane | Always end with an explicit Enter keystroke so the input actually executes. Never assume the pane runs it without Enter. |
-| Waiting for specialist callbacks | Also poll specialist panes periodically with `tmux-cli capture` — callbacks can flake if Enter was not sent; polling catches stuck panes. |
 | Current milestone is user-testable | stop for dogfooding before the next milestone |
 | Current milestone is accepted | check back, close and unregister the specialist panes for that milestone, and relaunch fresh specialists for the next milestone |
 | Provider is blocked | Reroute explicitly before launch. |

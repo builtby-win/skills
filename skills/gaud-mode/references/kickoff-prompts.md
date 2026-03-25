@@ -24,9 +24,9 @@ Always ensure Enter is sent after the tmux-cli send command so the conductor
 pane actually receives and executes the callback — do not just send keystrokes
 without confirming Enter is delivered.
 Use callbacks with milestone and workstream context:
-- GAUDMODE done role=ASSIGNED_ROLE milestone=<current milestone> workstream=<name> summary=<result>
-- GAUDMODE waiting-user role=ASSIGNED_ROLE milestone=<current milestone> workstream=<name> summary=<question or blocker>
-- GAUDMODE waiting-permission role=ASSIGNED_ROLE milestone=<current milestone> workstream=<name> summary=<permission needed>
+- GAUDMODE done role=ASSIGNED_ROLE milestone=CURRENT_MILESTONE workstream=WORKSTREAM_NAME summary=RESULT_SUMMARY
+- GAUDMODE waiting-user role=ASSIGNED_ROLE milestone=CURRENT_MILESTONE workstream=WORKSTREAM_NAME summary=QUESTION_OR_BLOCKER
+- GAUDMODE waiting-permission role=ASSIGNED_ROLE milestone=CURRENT_MILESTONE workstream=WORKSTREAM_NAME summary=PERMISSION_NEEDED
 Use waiting-user for product ambiguity, external decisions, or when the user must choose.
 Use waiting-permission for clearly safe execution approvals that gaud may inspect and auto-proceed once.
 Use done only when your scoped work for this milestone/workstream is complete.

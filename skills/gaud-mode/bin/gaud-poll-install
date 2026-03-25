@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Install gaud-poll binary. Finds the package relative to this skill's location,
+# builds it with bun, and symlinks it into ~/.local/bin (or ~/bin as fallback).
+set -euo pipefail
+
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Resolve package dir: works whether installed under skills/ or packages/
+# Installed path:  ~/.claude/skills/gaud-mode  → look for sibling gaud-poll package
+# Repo path:       skills/gaud-mode             → packages/gaud-poll
+find_package_dir() {
+  local candidates=(
+    "$SKILL_DIR/../../../packages/gaud-poll"
+    "$SKILL_DIR/../../packages/gaud-poll"
+    "$SKILL_DIR/../gaud-poll"
+  )
+  for d in "${candidates[@]}"; do
+    if [ -f "$d/package.json" ]; then
+      echo "$(cd "$d" && pwd)"
+      return 0
+    fi
+  done
+  return 1
+}
+
+PKG_DIR="$(find_package_dir)" || {
+  echo "ERROR: gaud-poll package not found relative to $SKILL_DIR" >&2
+  exit 1
+}
+
+BIN="$PKG_DIR/bin/gaud-poll"
+
+if [ -x "$BIN" ]; then
+  echo "gaud-poll already built at $BIN"
+else
+  if ! command -v bun >/dev/null 2>&1; then
+    echo "ERROR: bun is required to build gaud-poll. Install from https://bun.sh" >&2
+    exit 1
+  fi
+  echo "Building gaud-poll..."
+  (cd "$PKG_DIR" && bun install --frozen-lockfile && bun run build)
+  echo "Built: $BIN"
+fi
+
+# Symlink into PATH
+LINK_DIR=""
+if echo ":$PATH:" | grep -q ":$HOME/.local/bin:"; then
+  LINK_DIR="$HOME/.local/bin"
+elif echo ":$PATH:" | grep -q ":$HOME/bin:"; then
+  LINK_DIR="$HOME/bin"
+else
+  mkdir -p "$HOME/.local/bin"
+  LINK_DIR="$HOME/.local/bin"
+  echo "NOTE: Add $HOME/.local/bin to your PATH"
+fi
+
+mkdir -p "$LINK_DIR"
+ln -sf "$BIN" "$LINK_DIR/gaud-poll"
+echo "Linked: $LINK_DIR/gaud-poll → $BIN"
+echo "gaud-poll install complete."
