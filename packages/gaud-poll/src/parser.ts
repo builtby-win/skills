@@ -28,14 +28,14 @@ export function parseCallbacks(output: string): GaudCallback[] {
 
   for (const line of lines) {
     const trimmed = line.trim();
+    const normalized = stripDecorativePrefix(trimmed);
 
     // Skip instruction/template lines that show the callback format but aren't actual callbacks
     // e.g. lines containing "role=ASSIGNED_ROLE" or "role=..." or "CONDUCTOR_PANE_ID"
-    if (/role=(?:ASSIGNED_ROLE|\.{3})|CONDUCTOR_PANE_ID/i.test(trimmed)) continue;
+    if (/role=(?:ASSIGNED_ROLE|\.{3})|CONDUCTOR_PANE_ID/i.test(normalized)) continue;
 
-    // Match GAUDMODE or legacy GODMODE
-    const match = trimmed.match(
-      /(?:GAUDMODE|GODMODE)\s+(done|waiting-user|waiting-permission)\s+(.*)/i
+    const match = normalized.match(
+      /^(?:GAUDMODE|GODMODE)\s+(done|waiting-user|waiting-permission)\s+(.*)$/i
     );
     if (!match) continue;
 
@@ -52,6 +52,10 @@ export function parseCallbacks(output: string): GaudCallback[] {
   }
 
   return callbacks;
+}
+
+function stripDecorativePrefix(line: string): string {
+  return line.replace(/^[\s│┃┆╎╏║▏▕▎▍▌▋▊▉▐•∙·⏺]+/u, "");
 }
 
 function extractField(text: string, field: string): string | null {
