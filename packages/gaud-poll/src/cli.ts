@@ -4,6 +4,9 @@ import { GaudPoller, type PollEvent } from "./poller";
 import { listPanes } from "./tmux";
 import type { WatchedPane } from "./poller";
 import { parsePaneArg } from "./pane-args";
+import { StatusLine } from "./status-line";
+
+type Logger = (message: string) => void;
 
 const { values, positionals } = parseArgs({
   args: Bun.argv.slice(2),
@@ -52,8 +55,9 @@ async function runScan() {
     process.exit(1);
   }
 
+  const log: Logger = (msg) => console.error(msg);
   const poller = new GaudPoller({
-    onEvents: (events) => printEventsHuman(events),
+    onEvents: (events) => printEventsHuman(events, log),
     // No outputFile — skip JSONL for scan mode
   });
 
@@ -89,11 +93,16 @@ async function runWatch() {
     );
   }
 
+  const statusLine = new StatusLine();
+  const log: Logger = (msg) => statusLine.log(msg);
+
   const poller = new GaudPoller({
     interval,
     outputFile,
     conductorPane,
-    onEvents: (events) => printEventsHuman(events),
+    onEvents: (events) => printEventsHuman(events, log),
+    onPollStart: () => statusLine.setPolling(panes.length),
+    onPollEnd: (nextPollAt) => statusLine.setIdle(nextPollAt, panes.length),
   });
 
   for (const pane of panes) {
@@ -114,18 +123,18 @@ async function runWatch() {
   }
   console.error("");
 
+  statusLine.start();
   poller.start();
 
-  // Keep alive
-  process.on("SIGINT", () => {
-    console.error("\ngaud-poll: stopping");
+  const shutdown = (code: number, farewell?: string) => {
+    statusLine.stop();
+    if (farewell) process.stderr.write(farewell + "\n");
     poller.stop();
-    process.exit(0);
-  });
-  process.on("SIGTERM", () => {
-    poller.stop();
-    process.exit(0);
-  });
+    process.exit(code);
+  };
+
+  process.on("SIGINT", () => shutdown(0, "gaud-poll: stopping"));
+  process.on("SIGTERM", () => shutdown(0));
 }
 
 async function runPollOnce() {
@@ -136,9 +145,10 @@ async function runPollOnce() {
     return;
   }
 
+  const log: Logger = (msg) => console.error(msg);
   const poller = new GaudPoller({
     conductorPane: (values.conductor as string) ?? null,
-    onEvents: (events) => printEventsHuman(events),
+    onEvents: (events) => printEventsHuman(events, log),
   });
 
   for (const pane of panes) {
@@ -155,7 +165,7 @@ function parsePaneArgs(): WatchedPane[] {
   return paneArgs.map(parsePaneArg);
 }
 
-function printEventsHuman(events: PollEvent[]) {
+function printEventsHuman(events: PollEvent[], log: Logger) {
   for (const event of events) {
     const e = event.event;
     const prefix = `[${event.timestamp.slice(11, 19)}] ${event.paneId} (${event.role})`;
@@ -165,18 +175,14 @@ function printEventsHuman(events: PollEvent[]) {
         const cb = e.callback;
         const icon =
           cb.type === "done" ? "✅" : cb.type === "waiting-user" ? "🙋" : "🔑";
-        console.error(
-          `${icon} ${prefix}: ${cb.type} — ${cb.summary}`
-        );
+        log(`${icon} ${prefix}: ${cb.type} — ${cb.summary}`);
         break;
       }
       case "stuck":
-        console.error(
-          `⚠️  ${prefix}: STUCK (${e.indicator.type}) — ${e.indicator.detail}`
-        );
+        log(`⚠️  ${prefix}: STUCK (${e.indicator.type}) — ${e.indicator.detail}`);
         break;
       case "pane-dead":
-        console.error(`💀 ${prefix}: pane no longer exists`);
+        log(`💀 ${prefix}: pane no longer exists`);
         break;
     }
   }

@@ -117,6 +117,10 @@ export interface PollerOptions {
   conductorPane: string | null;
   /** Callback for each batch of events */
   onEvents?: (events: PollEvent[]) => void;
+  /** Fired right before each pollOnce() cycle begins */
+  onPollStart?: () => void;
+  /** Fired after each pollOnce() cycle, with the timestamp of the next one */
+  onPollEnd?: (nextPollAt: number) => void;
 }
 
 /**
@@ -170,17 +174,22 @@ export class GaudPoller {
 
   /** Run one poll cycle across all watched panes. */
   async pollOnce(): Promise<PollEvent[]> {
+    this.options.onPollStart?.();
     const allEvents: PollEvent[] = [];
 
-    for (const pane of this.panes.values()) {
-      const events = await pollPane(pane, this.seenCallbacks);
-      allEvents.push(...events);
-    }
+    try {
+      for (const pane of this.panes.values()) {
+        const events = await pollPane(pane, this.seenCallbacks);
+        allEvents.push(...events);
+      }
 
-    if (allEvents.length > 0) {
-      this.options.onEvents?.(allEvents);
-      await this.writeEvents(allEvents);
-      await this.forwardToConductor(allEvents);
+      if (allEvents.length > 0) {
+        this.options.onEvents?.(allEvents);
+        await this.writeEvents(allEvents);
+        await this.forwardToConductor(allEvents);
+      }
+    } finally {
+      this.options.onPollEnd?.(Date.now() + this.options.interval * 1000);
     }
 
     return allEvents;

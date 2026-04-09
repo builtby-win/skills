@@ -19,6 +19,21 @@ bun run build
 
 This compiles a self-contained binary at `bin/gaud-poll` — no runtime needed to run it after compilation.
 
+## Watch-mode status line
+
+In `watch` mode, `gaud-poll` renders a live single-line status indicator on
+stderr so the user can see that the poller is alive between polls:
+
+```
+⠋ next poll in 27s · watching 2 panes
+⠙ polling… (0.4s) · 2 panes
+```
+
+The status line auto-disables when stderr is not a TTY (e.g. redirected to a
+file or piped), so JSONL and log redirection stay clean. Event output is
+routed through the status line so callbacks, stuck notifications, and
+pane-dead messages never get stomped by the spinner.
+
 ## Usage
 
 ### Watch specialist panes and forward to conductor
