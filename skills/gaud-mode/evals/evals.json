@@ -40,7 +40,7 @@
     {
       "id": 6,
       "prompt": "Set up gaud-mode so specialist agents can notify the original conductor when they hit a permission gate or when they finish current milestone work. I want less manual polling and a cleaner callback loop.",
-      "expected_output": "The agent records the conductor pane ID, includes a `tmux-cli send \"GAUDMODE ...\" --pane=<conductor-pane>` callback protocol in kickoff prompts, and uses milestone-aware callbacks that include `role`, `milestone`, `workstream`, and `summary` for explicit `waiting-permission`, `waiting-user`, and `done` events while remaining able to recognize legacy `GODMODE` callbacks during transition.",
+      "expected_output": "The agent records the conductor pane ID, includes a `tmux-cli send \"GAUDMODE ...\" --pane=<conductor-pane>` callback protocol in kickoff prompts, tells workers to actively execute that callback back to the conductor pane when done or blocked, and uses milestone-aware callbacks that include `role`, `milestone`, `workstream`, and `summary` for explicit `waiting-permission`, `waiting-user`, and `done` events while remaining able to recognize legacy `GODMODE` callbacks during transition.",
       "files": []
     },
     {
@@ -155,6 +155,18 @@
       "id": 25,
       "prompt": "Use gaud-mode for a substantial feature. Assume `npx skills` and `npx playbooks` are unavailable in this environment, but the installed gaud-mode copy can still refresh itself directly from builtby-win/skills.",
       "expected_output": "The agent still runs the bundled update check first, falls back to gaud-mode's direct self-refresh path when the package CLIs are unavailable, and only proceeds into planning after the installed skill copy is refreshed or the direct fallback clearly reports why it cannot continue.",
+      "files": []
+    },
+    {
+      "id": 26,
+      "prompt": "Use gaud-mode for a milestone where a worker pane appears alive but its callback text seems stuck in the pane instead of reaching the conductor. Make sure the orchestrator understands the exact health signal it should look for.",
+      "expected_output": "The agent tells the orchestrator to recognize `GAUDMODE waiting-user ... workstream=gaud-poll summary=suspected-stuck: ...` as a pane-health/debug signal, not a normal product question, and to inspect or relaunch the worker instead of ignoring it.",
+      "files": []
+    },
+    {
+      "id": 27,
+      "prompt": "Use gaud-mode for a multi-role milestone. When a worker finishes or gets blocked, I want the worker panes to callback to the conductor pane instead of just describing their status in-place.",
+      "expected_output": "The agent tells each worker to actively execute the `tmux-cli send \"GAUDMODE ...\" --pane=<conductor-pane>` callback when done or blocked, and it reserves `summary=suspected-stuck: ...` under `waiting-user` for execution-health problems like pane stalls or callback transport failures.",
       "files": []
     }
   ]
