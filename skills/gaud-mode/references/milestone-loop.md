@@ -57,12 +57,17 @@ Gaud should check back often. Do not disappear into a long run.
 
 ## Fresh-Agent Rule
 
-- Keep only the `CEO/PM` conductor stable across milestones.
-- After an accepted milestone, retire the specialist panes used for that
-  milestone.
-- Relaunch fresh specialists with fresh context for the next milestone.
-- Do not preserve stale specialist context across milestones just because the
-  pane is already open.
+- Keep only the `CEO/PM` conductor stable across milestones. The conductor
+  window is never touched by gaud.
+- After an accepted milestone, retire the implementer panes for that milestone
+  with:
+  `"$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone <m> --role impl`
+- Relaunch fresh implementers for the next milestone via `add-pane` into the
+  existing `impl` window. Do not preserve stale implementer context across
+  milestones just because the pane is still open.
+- Long-lived observer panes in the `gaud` window (`gaud-poll`, and any UX,
+  Integrator, TPM, or Investigator splits you created) survive across
+  milestones. Retire them only if they were milestone-scoped to begin with.
 
 Fresh specialists reduce drift and keep each milestone grounded in the current
 plan.
@@ -77,23 +82,60 @@ plan.
 
 ## tmux Operating Notes
 
-- Keep a registry of which panes and windows gaud created.
-- Remove registry entries immediately when gaud retires or closes those panes.
-- Before `tmux-cli send` to any specialist, verify the target pane is still alive
-  and still hosts the expected specialist in a usable state.
+### Layout contract
+
+Gaud runs with a fixed two-window layout driven by
+`"$_GAUD_DIR/bin/gaud-tmux-layout"`:
+
+- The conductor stays in whatever window the user is already in. Never rename
+  or kill it.
+- Gaud adds exactly two windows to the right of the conductor on `init`:
+  - `gaud` — `gaud-poll` plus any observer panes (UX/UI, Integrator, TPM,
+    Investigator) as splits
+  - `impl` — 1-2 implementer panes, tiled
+- Pane identity lives in the pane title: `<role>:<workstream>:<milestone>`
+  (e.g. `impl:frontend:M1`, `poll:dark-mode:*`). This replaces the old
+  pane registry — `tmux list-panes -F '#{pane_id} #{pane_title}'` is the
+  source of truth.
+- Ownership lives in window user options: `@gaud-orchestrator=<id>` and
+  `@gaud-window={gaud|impl}`. Cleanup reads tags, never window names.
+
+### Liveness and relaunch
+
+- Before `tmux-cli send` to any specialist, verify the target pane is still
+  alive and still hosts the expected specialist in a usable state.
 - Treat a pane as stale/dead if tmux reports it closed, the agent was canceled,
   the specialist exited, or the pane no longer hosts the expected role.
-- If a pane fails that liveness check, relaunch the role with the current
-  milestone/workstream context, update the registry, then resend the current
-  task.
+- If a pane fails the liveness check, retire it and `add-pane` a fresh one with
+  the current milestone/workstream context, then resend the current task.
+  Re-running `add-pane` into an existing window splits a new pane and retiles.
 - Do not silently send to a closed or stale pane.
-- If relaunch fails repeatedly or provider health blocks the role, raise it as a
-  conductor-level blocker instead of retrying forever.
+- If relaunch fails repeatedly or provider health blocks the role, raise it as
+  a conductor-level blocker instead of retrying forever.
+
+### Callbacks and health signals
+
 - Prefer `gaud-poll` plus `wait_idle` and `capture` to monitor progress.
-- If `gaud-poll` is unavailable or unhealthy, fall back to direct callbacks from
-  implementers to the conductor pane with `tmux-cli send`, and keep periodic
-  pane polling enabled so missed callbacks are still recoverable.
-- When `gaud-poll` reports `GAUDMODE waiting-user ... workstream=gaud-poll summary=suspected-stuck: ...`, treat that as a pane-health/debug signal. Inspect the pane, verify liveness, and decide whether to resend, relaunch, or escalate.
-- When a worker reports `GAUDMODE waiting-user ... summary=suspected-stuck: ...`, assume the worker is signaling execution-health trouble rather than ordinary product ambiguity.
-- Clean up gaud-created specialist panes after acceptance, cancellation, or full
-  completion, and unregister those panes as part of the same cleanup step.
+  `gaud-poll` should live in the `gaud` window as its first pane.
+- If `gaud-poll` is unavailable or unhealthy, fall back to direct callbacks
+  from implementers to the conductor pane with `tmux-cli send`, and keep
+  periodic pane polling enabled so missed callbacks are still recoverable.
+- When `gaud-poll` reports
+  `GAUDMODE waiting-user ... workstream=gaud-poll summary=suspected-stuck: ...`,
+  treat that as a pane-health/debug signal. Inspect the pane, verify liveness,
+  and decide whether to resend, relaunch, or escalate.
+- When a worker reports `GAUDMODE waiting-user ... summary=suspected-stuck: ...`,
+  assume the worker is signaling execution-health trouble rather than ordinary
+  product ambiguity.
+
+### Cleanup
+
+- After an accepted milestone:
+  `"$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone <m> --role impl`
+- After a canceled run or full program completion:
+  `"$_GAUD_DIR/bin/gaud-tmux-layout" end --orchestrator <id>`
+- The helper refuses to touch any window that is not tagged
+  `@gaud-orchestrator=<current id>`, and it never kills the conductor window.
+- If `gaud-tmux-layout` itself is missing from the installed skill, re-run the
+  gaud update check (`"$_GAUD_DIR/bin/gaud-mode-update-check"`) and refresh
+  before continuing cleanup.

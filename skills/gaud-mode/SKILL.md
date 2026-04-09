@@ -10,6 +10,8 @@ Run this first on every gaud invocation:
 ```bash
 _GAUD_DIR=""
 for d in \
+  "$PWD/skills/gaud-mode" \
+  "skills/gaud-mode" \
   "$HOME/.claude/skills/gaud-mode" \
   ".claude/skills/gaud-mode" \
   "$HOME/.config/opencode/skills/gaud-mode" \
@@ -31,6 +33,7 @@ fi
 - Prefer `npx -y skills add builtby-win/skills --skill gaud-mode --yes` or `npx -y playbooks add skill builtby-win/skills --skill gaud-mode -y`.
 - `"$_GAUD_DIR/bin/gaud-mode-upgrade"` may be used as the wrapper when gaud should choose automatically.
 - If output shows `JUST_UPGRADED <from> <to>`, tell the user `Running gaud-mode v{to} (just updated)` and continue.
+- The search list must cover both installed skill locations and repo checkouts such as `$PWD/skills/gaud-mode`.
 
 # Gaud Mode
 
@@ -141,6 +144,50 @@ Keep launches boring and predictable.
 - Do not send multiline prompts in a way that breaks shell quoting.
 - If the launch transport cannot safely preserve embedded quotes, use a safer transport.
 
+## Tmux Layout
+
+Use the bundled helper so the user never loses track of the run:
+
+```
+"$_GAUD_DIR/bin/gaud-tmux-layout"
+```
+
+`$_GAUD_DIR` is the same skill root resolved by the update-check block at the top of this file. The helper is plain bash, ships with the skill, and has no install step beyond the skill download.
+
+Layout contract:
+- The conductor stays in whatever window the user already has open. Gaud never renames or moves that window.
+- Gaud adds at most two new windows, inserted immediately to the right of the conductor:
+  - `gaud` — holds `gaud-poll` plus any observer panes (UX/UI, Integrator, TPM, Investigator) as splits
+  - `impl` — holds 1-2 implementer panes, tiled; grow past 2 only when the plan clearly needs it
+- Each new window is tagged with `@gaud-orchestrator=<id>` and `@gaud-window={gaud|impl}`. Cleanup reads those tags, never window names.
+- Pane identity lives in the pane title: `<role>:<workstream>:<milestone>` (for example `impl:frontend:M1`, `poll:dark-mode:*`, `ux:dark-mode:M1`).
+- While gaud is running, the helper flips `renumber-windows on` for the session so retiring panes does not leave index gaps. The previous value is saved and restored on `end`.
+
+Typical call sequence:
+
+```bash
+# Once per orchestrator run
+"$_GAUD_DIR/bin/gaud-tmux-layout" init --orchestrator <id>
+
+# gaud-poll lives in the gaud window
+"$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --orchestrator <id> --window gaud \
+  --role poll --workstream <id> --milestone '*' \
+  --command 'gaud-poll watch -c <conductor> -p <pane>:<role>:<cmd>'
+
+# Implementers live in the impl window (first call replaces the placeholder shell)
+"$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --orchestrator <id> --window impl \
+  --role impl --workstream frontend --milestone M1 \
+  --command 'B2V_DISABLED=true codex --yolo -m <model> "<kickoff prompt>"'
+
+# After a milestone is accepted
+"$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone M1 --role impl
+
+# At the end of the program
+"$_GAUD_DIR/bin/gaud-tmux-layout" end --orchestrator <id>
+```
+
+The helper refuses to touch a window that is not tagged with the current orchestrator id and will not kill the conductor window even by accident.
+
 ## Milestone Loop
 
 Canonical loop:
@@ -154,8 +201,10 @@ When the orchestrator sees `summary=suspected-stuck: ...`, it should inspect the
 Keep only one active milestone at a time.
 
 After an accepted milestone:
-- retire the implementer panes used for that milestone
+- retire the implementer panes used for that milestone via
+  `"$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone <m> --role impl`
 - relaunch fresh implementers for the next milestone
+- at the end of the program, run `"$_GAUD_DIR/bin/gaud-tmux-layout" end --orchestrator <id>` to close the `gaud` and `impl` windows without touching the conductor window
 
 ## Guardrails
 
@@ -165,6 +214,7 @@ After an accepted milestone:
 - never treat a shell-dropped pane as healthy
 - never trust callback examples copied from prompt text as real callbacks
 - never start the next milestone before the current one is accepted or explicitly reworked
+- never kill or rename a tmux window that is not tagged `@gaud-orchestrator=<current id>`; the conductor window has no such tag and must stay untouched
 
 ## References
 

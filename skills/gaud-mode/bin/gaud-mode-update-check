@@ -6,7 +6,7 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 STATE_DIR="${GAUD_MODE_STATE_DIR:-$HOME/.gaud-mode}"
 MARKER_FILE="$STATE_DIR/just-upgraded-from"
 VERSION_FILE="$SKILL_DIR/VERSION"
-REMOTE_URL="${GAUD_MODE_REMOTE_URL:-https://raw.githubusercontent.com/builtby-win/skills/main/skills/gaud-mode/VERSION}"
+REMOTE_URL="https://raw.githubusercontent.com/builtby-win/skills/main/skills/gaud-mode/VERSION"
 
 LOCAL=""
 if [ -f "$VERSION_FILE" ]; then

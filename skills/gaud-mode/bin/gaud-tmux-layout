@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+# gaud-tmux-layout — opinionated tmux window/pane layout for gaud-mode.
+#
+# Layout contract:
+#   - The conductor stays in the caller's current tmux window. Never touched.
+#   - Gaud adds at most two windows immediately to the right:
+#       "gaud" — gaud-poll plus observer panes (ux, intg, tpm, inv) as splits
+#       "impl" — 1-2 implementer panes (more only if the plan clearly needs it)
+#   - Windows are tagged with user options:
+#       @gaud-orchestrator=<id>
+#       @gaud-window={gaud|impl}
+#       @gaud-placeholder={0|1}   (1 until the first real pane replaces the
+#                                  shell new-window created)
+#   - Panes carry identity via pane_title: "<role>:<workstream>:<milestone>".
+#   - Cleanup is driven off @gaud-orchestrator tags, never window names.
+#
+# No external deps beyond tmux. Pure bash.
+
+set -euo pipefail
+
+die() { printf 'gaud-tmux-layout: %s\n' "$*" >&2; exit 1; }
+
+[ -n "${TMUX:-}" ] || die "not inside a tmux session"
+command -v tmux >/dev/null 2>&1 || die "tmux not found on PATH"
+
+# ---- tmux helpers -----------------------------------------------------------
+
+tmux_get_w() { # window-level user option; empty when unset
+  local win=$1 opt=$2
+  tmux show-options -w -t "$win" -v "$opt" 2>/dev/null || true
+}
+
+tmux_get_s() { # session-level option; empty when unset
+  local sess=$1 opt=$2
+  tmux show-options -t "$sess" -v "$opt" 2>/dev/null || true
+}
+
+current_window_id() { tmux display-message -p '#{window_id}'; }
+current_session_id() { tmux display-message -p '#{session_id}'; }
+
+# List gaud-owned windows, optionally filtered by orchestrator id.
+# Prints: window_id|window_name|session_id|gaud_window|orchestrator
+list_gaud_windows() {
+  local filter=${1:-}
+  local win_id win_name sess_id gwin orch
+  tmux list-windows -a -F '#{window_id}|#{window_name}|#{session_id}' 2>/dev/null \
+    | while IFS='|' read -r win_id win_name sess_id; do
+        [ -n "$win_id" ] || continue
+        orch=$(tmux_get_w "$win_id" @gaud-orchestrator)
+        [ -n "$orch" ] || continue
+        if [ -n "$filter" ] && [ "$orch" != "$filter" ]; then
+          continue
+        fi
+        gwin=$(tmux_get_w "$win_id" @gaud-window)
+        printf '%s|%s|%s|%s|%s\n' "$win_id" "$win_name" "$sess_id" "$gwin" "$orch"
+      done
+}
+
+find_gaud_window() { # orchestrator id, kind → window_id (or empty)
+  local orch=$1 kind=$2
+  list_gaud_windows "$orch" | awk -F'|' -v k="$kind" '$4==k {print $1; exit}'
+}
+
+tag_window() {
+  local win=$1 orch=$2 kind=$3
+  tmux set-option -w -t "$win" @gaud-orchestrator "$orch" >/dev/null
+  tmux set-option -w -t "$win" @gaud-window "$kind" >/dev/null
+  tmux set-option -w -t "$win" @gaud-placeholder "1" >/dev/null
+}
+
+assert_safe_token() { # no spaces, no colons, no pipes
+  local name=$1 value=$2
+  case $value in
+    *[[:space:]:\|]*) die "$name must not contain spaces, ':' or '|'" ;;
+    "") die "$name must not be empty" ;;
+  esac
+}
+
+# ---- init -------------------------------------------------------------------
+
+cmd_init() {
+  local orch="" target_sess=""
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --orchestrator) orch=$2; shift 2 ;;
+      --session)      target_sess=$2; shift 2 ;;
+      -h|--help)      usage; exit 0 ;;
+      *) die "unknown init arg: $1" ;;
+    esac
+  done
+  [ -n "$orch" ] || die "init: --orchestrator required"
+  assert_safe_token "orchestrator id" "$orch"
+
+  if [ -n "$(list_gaud_windows "$orch")" ]; then
+    die "orchestrator '$orch' already has gaud windows (run 'end' first)"
+  fi
+
+  local target_win
+  target_win=$(current_window_id)
+  [ -n "$target_sess" ] || target_sess=$(current_session_id)
+
+  # Save and override renumber-windows the first time gaud runs in this session.
+  local sess_has_gaud
+  sess_has_gaud=$(list_gaud_windows | awk -F'|' -v s="$target_sess" '$3==s {print; exit}')
+  if [ -z "$sess_has_gaud" ] && [ -z "$(tmux_get_s "$target_sess" @gaud-prev-renumber)" ]; then
+    local prev
+    prev=$(tmux_get_s "$target_sess" renumber-windows)
+    tmux set-option -t "$target_sess" @gaud-prev-renumber "${prev:-__unset__}" >/dev/null
+    tmux set-option -t "$target_sess" renumber-windows on >/dev/null
+  fi
+
+  # Create impl first, then gaud, so final order is conductor → gaud → impl.
+  local impl_win gaud_win
+  impl_win=$(tmux new-window -d -a -t "$target_win" -n impl -P -F '#{window_id}')
+  gaud_win=$(tmux new-window -d -a -t "$target_win" -n gaud -P -F '#{window_id}')
+
+  tag_window "$gaud_win" "$orch" gaud
+  tag_window "$impl_win" "$orch" impl
+
+  printf 'init orchestrator=%s gaud=%s impl=%s\n' "$orch" "$gaud_win" "$impl_win"
+}
+
+# ---- add-pane ---------------------------------------------------------------
+
+cmd_add_pane() {
+  local orch="" kind="" role="" ws="" milestone="" command=""
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --orchestrator) orch=$2; shift 2 ;;
+      --window)       kind=$2; shift 2 ;;
+      --role)         role=$2; shift 2 ;;
+      --workstream)   ws=$2; shift 2 ;;
+      --milestone)    milestone=$2; shift 2 ;;
+      --command)      command=$2; shift 2 ;;
+      -h|--help)      usage; exit 0 ;;
+      *) die "unknown add-pane arg: $1" ;;
+    esac
+  done
+  [ -n "$orch" ] || die "add-pane: --orchestrator required"
+  [ -n "$kind" ] || die "add-pane: --window required (gaud|impl)"
+  [ "$kind" = gaud ] || [ "$kind" = impl ] || die "--window must be 'gaud' or 'impl'"
+  [ -n "$command" ] || die "add-pane: --command required"
+  assert_safe_token "role" "$role"
+  assert_safe_token "workstream" "$ws"
+  assert_safe_token "milestone" "$milestone"
+
+  local win
+  win=$(find_gaud_window "$orch" "$kind")
+  [ -n "$win" ] || die "no '$kind' window for orchestrator '$orch' (run 'init' first)"
+
+  local title pane placeholder
+  title="$role:$ws:$milestone"
+  placeholder=$(tmux_get_w "$win" @gaud-placeholder)
+
+  if [ "$placeholder" = "1" ]; then
+    pane=$(tmux list-panes -t "$win" -F '#{pane_id}' | head -n1)
+    tmux respawn-pane -k -t "$pane" "$command" >/dev/null
+    tmux set-option -w -t "$win" @gaud-placeholder 0 >/dev/null
+  else
+    pane=$(tmux split-window -d -t "$win" -P -F '#{pane_id}' "$command")
+    tmux select-layout -t "$win" tiled >/dev/null
+  fi
+
+  tmux select-pane -t "$pane" -T "$title" >/dev/null
+  printf 'add-pane window=%s pane=%s title=%s\n' "$win" "$pane" "$title"
+}
+
+# ---- list -------------------------------------------------------------------
+
+cmd_list() {
+  local orch=""
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --orchestrator) orch=$2; shift 2 ;;
+      -h|--help)      usage; exit 0 ;;
+      *) die "unknown list arg: $1" ;;
+    esac
+  done
+  local any=0 win_id win_name sess_id gwin orch_id
+  while IFS='|' read -r win_id win_name sess_id gwin orch_id; do
+    [ -n "$win_id" ] || continue
+    any=1
+    printf '%s  [%s] %s (orchestrator=%s, session=%s)\n' \
+      "$win_id" "$gwin" "$win_name" "$orch_id" "$sess_id"
+    tmux list-panes -t "$win_id" \
+      -F '    #{pane_id}  title="#{pane_title}"  cmd=#{pane_current_command}' \
+      2>/dev/null || true
+  done < <(list_gaud_windows "$orch")
+  [ "$any" = 1 ] || printf 'no gaud windows\n'
+}
+
+# ---- retire -----------------------------------------------------------------
+
+cmd_retire() {
+  local orch="" milestone="" role_filter="" stale=0
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --orchestrator) orch=$2; shift 2 ;;
+      --milestone)    milestone=$2; shift 2 ;;
+      --role)         role_filter=$2; shift 2 ;;
+      --stale)        stale=1; shift ;;
+      -h|--help)      usage; exit 0 ;;
+      *) die "unknown retire arg: $1" ;;
+    esac
+  done
+  [ -n "$orch" ] || die "retire: --orchestrator required"
+  if [ -z "$milestone" ] && [ -z "$role_filter" ] && [ "$stale" = 0 ]; then
+    die "retire requires at least one of --milestone, --role, --stale"
+  fi
+
+  local shells=" zsh bash sh fish dash ksh "
+  local win_id win_name sess_id gwin orch_id pane title cmd match
+  while IFS='|' read -r win_id win_name sess_id gwin orch_id; do
+    [ -n "$win_id" ] || continue
+    # Defense in depth: never act on a window that lost its tag mid-run.
+    [ "$(tmux_get_w "$win_id" @gaud-orchestrator)" = "$orch" ] || continue
+
+    while IFS='|' read -r pane title cmd; do
+      [ -n "$pane" ] || continue
+      match=1
+      if [ -n "$milestone" ]; then
+        case $title in *":$milestone") ;; *) match=0 ;; esac
+      fi
+      if [ "$match" = 1 ] && [ -n "$role_filter" ]; then
+        case $title in "$role_filter":*) ;; *) match=0 ;; esac
+      fi
+      if [ "$match" = 1 ] && [ "$stale" = 1 ]; then
+        case $shells in *" $cmd "*) ;; *) match=0 ;; esac
+      fi
+      if [ "$match" = 1 ]; then
+        tmux kill-pane -t "$pane" 2>/dev/null || true
+        printf 'retired pane=%s title=%s\n' "$pane" "$title"
+      fi
+    done < <(tmux list-panes -t "$win_id" \
+              -F '#{pane_id}|#{pane_title}|#{pane_current_command}' 2>/dev/null || true)
+  done < <(list_gaud_windows "$orch")
+}
+
+# ---- end --------------------------------------------------------------------
+
+cmd_end() {
+  local orch=""
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --orchestrator) orch=$2; shift 2 ;;
+      -h|--help)      usage; exit 0 ;;
+      *) die "unknown end arg: $1" ;;
+    esac
+  done
+  [ -n "$orch" ] || die "end: --orchestrator required"
+
+  local current_win touched_sessions=""
+  current_win=$(current_window_id)
+
+  local win_id win_name sess_id gwin orch_id
+  while IFS='|' read -r win_id win_name sess_id gwin orch_id; do
+    [ -n "$win_id" ] || continue
+    [ "$(tmux_get_w "$win_id" @gaud-orchestrator)" = "$orch" ] || continue
+    if [ "$win_id" = "$current_win" ]; then
+      printf 'skipped current window %s (conductor)\n' "$win_id"
+      continue
+    fi
+    tmux kill-window -t "$win_id" 2>/dev/null || true
+    printf 'killed window=%s\n' "$win_id"
+    case " $touched_sessions " in
+      *" $sess_id "*) ;;
+      *) touched_sessions="$touched_sessions $sess_id" ;;
+    esac
+  done < <(list_gaud_windows "$orch")
+
+  # Restore renumber-windows per touched session, but only if no gaud windows
+  # for any orchestrator remain there.
+  local s remaining prev
+  for s in $touched_sessions; do
+    remaining=$(list_gaud_windows | awk -F'|' -v s="$s" '$3==s {print; exit}')
+    [ -z "$remaining" ] || continue
+    prev=$(tmux_get_s "$s" @gaud-prev-renumber)
+    [ -n "$prev" ] || continue
+    if [ "$prev" = "__unset__" ]; then
+      tmux set-option -t "$s" -u renumber-windows >/dev/null 2>&1 || true
+    else
+      tmux set-option -t "$s" renumber-windows "$prev" >/dev/null 2>&1 || true
+    fi
+    tmux set-option -t "$s" -u @gaud-prev-renumber >/dev/null 2>&1 || true
+    printf 'restored renumber-windows on session=%s\n' "$s"
+  done
+}
+
+# ---- usage ------------------------------------------------------------------
+
+usage() {
+  cat <<'EOF'
+gaud-tmux-layout — tmux layout helper for gaud-mode
+
+USAGE
+  gaud-tmux-layout init       --orchestrator <id> [--session <name>]
+  gaud-tmux-layout add-pane   --orchestrator <id> --window {gaud|impl}
+                              --role <role> --workstream <ws> --milestone <m>
+                              --command '<shell command>'
+  gaud-tmux-layout list       [--orchestrator <id>]
+  gaud-tmux-layout retire     --orchestrator <id>
+                              [--milestone <m>] [--role <role>] [--stale]
+  gaud-tmux-layout end        --orchestrator <id>
+
+LAYOUT
+  conductor window (untouched)  →  "gaud" window  →  "impl" window
+  Pane titles use the form:  <role>:<workstream>:<milestone>
+  Examples:                  poll:dark-mode:*    impl:frontend:M1
+
+GUARANTEES
+  - Never touches a window without @gaud-orchestrator=<current id>.
+  - Never kills the conductor window (the caller's current window).
+  - 'retire' requires at least one filter (--milestone, --role, or --stale).
+  - 'end' restores the session's renumber-windows to its pre-gaud value.
+
+EXAMPLES
+  gaud-tmux-layout init --orchestrator dark-mode
+
+  gaud-tmux-layout add-pane --orchestrator dark-mode --window gaud \
+    --role poll --workstream dark-mode --milestone '*' \
+    --command 'gaud-poll watch -c %0 -p %5:Implementer:codex'
+
+  gaud-tmux-layout add-pane --orchestrator dark-mode --window impl \
+    --role impl --workstream frontend --milestone M1 \
+    --command 'B2V_DISABLED=true codex --yolo -m gpt-5.4-mini "..."'
+
+  gaud-tmux-layout retire --orchestrator dark-mode --milestone M1 --role impl
+  gaud-tmux-layout end    --orchestrator dark-mode
+EOF
+}
+
+# ---- dispatch ---------------------------------------------------------------
+
+[ $# -gt 0 ] || { usage; exit 1; }
+cmd=$1; shift
+case $cmd in
+  init)              cmd_init "$@" ;;
+  add-pane)          cmd_add_pane "$@" ;;
+  list)              cmd_list "$@" ;;
+  retire)            cmd_retire "$@" ;;
+  end)               cmd_end "$@" ;;
+  -h|--help|help)    usage ;;
+  *) die "unknown command: $cmd" ;;
+esac

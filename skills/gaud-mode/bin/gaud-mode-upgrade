@@ -12,7 +12,7 @@ if [ -z "$VERSION_FILE" ]; then
 fi
 
 SKILL_DIR="$(cd "$(dirname "$VERSION_FILE")" && pwd)"
-REMOTE_REPO_URL="${GAUD_MODE_REPO_URL:-https://github.com/builtby-win/skills.git}"
+REMOTE_REPO_URL="https://github.com/builtby-win/skills.git"
 REMOTE_BRANCH="${GAUD_MODE_REMOTE_BRANCH:-main}"
 
 is_repo_source_checkout() {

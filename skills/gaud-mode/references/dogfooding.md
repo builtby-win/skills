@@ -50,7 +50,10 @@ Do not start the next milestone until that decision is made.
 ## Fresh Context After Acceptance
 
 When a user-testable milestone is accepted:
-- clean up the gaud-created specialist panes for that milestone and unregister
-  their registry entries
-- keep only the conductor stable
-- launch fresh specialists for the next milestone with the updated plan context
+- retire the implementer panes for that milestone via
+  `"$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone <m> --role impl`
+- keep the conductor window and the `gaud` observer window stable
+- add fresh implementer panes for the next milestone with
+  `"$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --orchestrator <id> --window impl ...`
+  so each new milestone launches with clean context instead of reusing stale
+  panes

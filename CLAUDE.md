@@ -58,7 +58,22 @@ missing, show a recommended role map, and let the user override it.
 Every invocation should also run `skills/gaud-mode/bin/gaud-mode-update-check`
 first and refresh the installed skill from `builtby-win/skills` before gaud
 starts orchestration when a newer version exists, preferably via `npx skills`
-or `npx playbooks` rather than hand-editing the installed copy.
+or `npx playbooks` rather than hand-editing the installed copy. That preflight
+must work both from installed skill locations and from a repo checkout such as
+`$PWD/skills/gaud-mode`.
+
+tmux layout is owned by `skills/gaud-mode/bin/gaud-tmux-layout`, a bundled bash
+helper with no extra install step. It enforces a fixed two-window layout:
+
+- the `CEO/PM` conductor stays in whatever tmux window the user is already in
+  and is never touched
+- a `gaud` window immediately to the right holds `gaud-poll` plus any UX,
+  Integrator, TPM, or Investigator panes as splits
+- an `impl` window next to that holds 1-2 `Implementer` panes, tiled
+- each gaud-owned window is tagged with `@gaud-orchestrator=<id>` and pane
+  titles follow `<role>:<workstream>:<milestone>`; cleanup via
+  `gaud-tmux-layout retire` / `gaud-tmux-layout end` refuses to touch any
+  window without a matching orchestrator tag
 
 Canonical skill name:
 - `gaud-mode`

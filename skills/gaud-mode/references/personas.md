@@ -102,3 +102,9 @@
   launch.
 - Keep the `CEO/PM` stable across the program. Relaunch the specialists with
   fresh context after each accepted milestone.
+- Physical layout is fixed by `"$_GAUD_DIR/bin/gaud-tmux-layout"`: the `CEO/PM`
+  conductor stays in the user's current window, the `gaud` window holds
+  `gaud-poll` plus any UX, Integrator, TPM, or Investigator panes as splits,
+  and the `impl` window holds 1-2 `Implementer` panes. Roles that are
+  short-lived per milestone live in `impl`; roles that span milestones live in
+  `gaud`.

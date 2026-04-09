@@ -52,7 +52,9 @@ missing, show a recommended role map, and let the user override it.
 Every invocation should also run `skills/gaud-mode/bin/gaud-mode-update-check`
 first and refresh the installed skill from `builtby-win/skills` before gaud
 starts orchestration when a newer version exists, preferably via `npx skills`
-or `npx playbooks` rather than hand-editing the installed copy.
+or `npx playbooks` rather than hand-editing the installed copy. That preflight
+must work both from installed skill locations and from a repo checkout such as
+`$PWD/skills/gaud-mode`.
 
 Canonical skill name:
 - `gaud-mode`

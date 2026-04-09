@@ -88,7 +88,7 @@
     {
       "id": 14,
       "prompt": "Use gaud-mode for a feature big enough to need four total panes including the conductor. Do not cram them all into one tmux window if it gets messy.",
-      "expected_output": "The agent keeps at most three total panes in one tmux window, counts the conductor pane toward that limit, reuses an existing tmux window with spare capacity before creating a new one, tracks each specialist by `session:window.pane`, and reports the multi-window layout clearly enough for follow-up routing.",
+      "expected_output": "The agent uses `gaud-tmux-layout init` to create the fixed two-window layout (`gaud` and `impl`) immediately to the right of the conductor window, keeps the conductor alone in its own window, places `gaud-poll` and any long-lived observer panes (UX/UI, Integrator, TPM, Investigator) as splits inside the `gaud` window, keeps 1 or 2 `Implementer` panes inside the `impl` window, identifies panes by their `<role>:<workstream>:<milestone>` titles, and refuses to rename or kill the conductor window.",
       "files": []
     },
     {
@@ -100,7 +100,7 @@
     {
       "id": 16,
       "prompt": "After gaud-mode finishes the work, I do not want the tmux panes it created hanging around and cluttering the session.",
-      "expected_output": "The agent tracks which specialist panes and tmux windows it created, reuses only what it needs during the run, then closes and unregisters the specialist panes it spun up after the current milestone or program is complete. It closes empty tmux windows that gaud-mode created, but it does not kill the conductor pane or unrelated pre-existing user panes unless the user explicitly asks for that.",
+      "expected_output": "The agent retires implementer panes after each accepted milestone with `gaud-tmux-layout retire --orchestrator <id> --milestone <m> --role impl`, runs `gaud-tmux-layout end --orchestrator <id>` at program completion to close the `gaud` and `impl` windows, and relies on `@gaud-orchestrator=<id>` tags so the helper refuses to touch the conductor window or any pre-existing user windows that gaud did not create.",
       "files": []
     },
     {
@@ -158,6 +158,12 @@
       "files": []
     },
     {
+      "id": 28,
+      "prompt": "Use gaud-mode from a local repo checkout rather than an installed global skill copy. Before you orchestrate anything, make sure the normal gaud update preflight still runs.",
+      "expected_output": "The agent still runs gaud-mode's bundled update check first when invoked from a repo checkout, including repo-local paths such as `$PWD/skills/gaud-mode`, and it refreshes before orchestration if that check reports a newer version.",
+      "files": []
+    },
+    {
       "id": 26,
       "prompt": "Use gaud-mode for a milestone where a worker pane appears alive but its callback text seems stuck in the pane instead of reaching the conductor. Make sure the orchestrator understands the exact health signal it should look for.",
       "expected_output": "The agent tells the orchestrator to recognize `GAUDMODE waiting-user ... workstream=gaud-poll summary=suspected-stuck: ...` as a pane-health/debug signal, not a normal product question, and to inspect or relaunch the worker instead of ignoring it.",
@@ -167,6 +173,12 @@
       "id": 27,
       "prompt": "Use gaud-mode for a multi-role milestone. When a worker finishes or gets blocked, I want the worker panes to callback to the conductor pane instead of just describing their status in-place.",
       "expected_output": "The agent tells each worker to actively execute the `tmux-cli send \"GAUDMODE ...\" --pane=<conductor-pane>` callback when done or blocked, and it reserves `summary=suspected-stuck: ...` under `waiting-user` for execution-health problems like pane stalls or callback transport failures.",
+      "files": []
+    },
+    {
+      "id": 29,
+      "prompt": "Use gaud-mode for a two-milestone feature and be explicit about the tmux layout. I keep losing track of which pane is which when the run has been going for a while.",
+      "expected_output": "The agent runs `gaud-tmux-layout init --orchestrator <id>` once per run, places the `gaud` and `impl` windows immediately to the right of the conductor, creates panes via `gaud-tmux-layout add-pane` with pane titles of the form `<role>:<workstream>:<milestone>` (e.g. `poll:<id>:*`, `impl:frontend:M1`), identifies panes by those titles rather than raw tmux coordinates, relies on `@gaud-orchestrator` window tags for ownership, and retires milestone-scoped implementer panes via `gaud-tmux-layout retire --milestone` between milestones while leaving the `gaud` observer window and the conductor window alone.",
       "files": []
     }
   ]
