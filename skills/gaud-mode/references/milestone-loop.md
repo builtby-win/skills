@@ -89,6 +89,11 @@ plan.
 - Do not silently send to a closed or stale pane.
 - If relaunch fails repeatedly or provider health blocks the role, raise it as a
   conductor-level blocker instead of retrying forever.
-- Use callbacks plus `wait_idle` and `capture` to monitor progress.
+- Prefer `gaud-poll` plus `wait_idle` and `capture` to monitor progress.
+- If `gaud-poll` is unavailable or unhealthy, fall back to direct callbacks from
+  implementers to the conductor pane with `tmux-cli send`, and keep periodic
+  pane polling enabled so missed callbacks are still recoverable.
+- When `gaud-poll` reports `GAUDMODE waiting-user ... workstream=gaud-poll summary=suspected-stuck: ...`, treat that as a pane-health/debug signal. Inspect the pane, verify liveness, and decide whether to resend, relaunch, or escalate.
+- When a worker reports `GAUDMODE waiting-user ... summary=suspected-stuck: ...`, assume the worker is signaling execution-health trouble rather than ordinary product ambiguity.
 - Clean up gaud-created specialist panes after acceptance, cancellation, or full
   completion, and unregister those panes as part of the same cleanup step.

@@ -62,6 +62,10 @@
   that needs a decision (never self-decide how to handle errors), or
   `GAUDMODE waiting-permission` for clearly safe execution approvals that gaud
   may inspect and auto-proceed once.
+- Use `GAUDMODE waiting-user ... summary=suspected-stuck: ...` when execution-health is the blocker, such as a shell-drop, pane stall, or callback transport problem. That is a conductor-debug signal, not a product question.
+- Orchestrator contract: every implementer kickoff must name the orchestrator
+  agent for the run and the real conductor pane ID to callback to. The worker
+  should actively execute callbacks back to that pane when done or blocked.
 - Default provider bias: Codex.
 
 ## Integrator
