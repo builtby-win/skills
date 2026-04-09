@@ -50,4 +50,20 @@ describe("parseCallbacks", () => {
 
     expect(callbacks).toHaveLength(0);
   });
+
+  test("parses suspected-stuck waiting-user callbacks without losing the summary text", () => {
+    const callbacks = parseCallbacks(
+      "GAUDMODE waiting-user role=Implementer milestone=M1 workstream=gaud-poll summary=suspected-stuck: pane %5 shell-dropped - Expected codex, pane now running zsh"
+    );
+
+    expect(callbacks).toHaveLength(1);
+    expect(callbacks[0]).toMatchObject({
+      type: "waiting-user",
+      role: "Implementer",
+      milestone: "M1",
+      workstream: "gaud-poll",
+      summary:
+        "suspected-stuck: pane %5 shell-dropped - Expected codex, pane now running zsh",
+    });
+  });
 });

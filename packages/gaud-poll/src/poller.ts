@@ -123,7 +123,7 @@ export interface PollerOptions {
  * Format a PollEvent into a GAUDMODE message the conductor can parse.
  * Uses the same callback protocol the specialists use.
  */
-function formatEventForConductor(event: PollEvent): string | null {
+export function formatEventForConductor(event: PollEvent): string | null {
   const e = event.event;
   const paneId = event.paneId;
   const role = event.role;
@@ -132,13 +132,14 @@ function formatEventForConductor(event: PollEvent): string | null {
   switch (e.kind) {
     case "callback": {
       const cb = e.callback;
-      // Re-forward the original callback — the conductor sees it as if the specialist sent it
-      return `GAUDMODE ${cb.type} role=${cb.role} milestone=${cb.milestone} workstream=${cb.workstream} summary=[gaud-poll detected from ${paneId}] ${cb.summary}`;
+      // Preserve the worker callback contract so the conductor sees the same event
+      // shape the specialist was instructed to send.
+      return `GAUDMODE ${cb.type} role=${cb.role} milestone=${cb.milestone} workstream=${cb.workstream} summary=${cb.summary}`;
     }
     case "stuck":
-      return `GAUDMODE waiting-user role=${role} milestone=${milestone} workstream=gaud-poll summary=[gaud-poll] pane ${paneId} stuck: ${e.indicator.type} — ${e.indicator.detail}`;
+      return `GAUDMODE waiting-user role=${role} milestone=${milestone} workstream=gaud-poll summary=suspected-stuck: pane ${paneId} ${e.indicator.type} - ${e.indicator.detail}`;
     case "pane-dead":
-      return `GAUDMODE waiting-user role=${role} milestone=${milestone} workstream=gaud-poll summary=[gaud-poll] pane ${paneId} is dead — specialist exited or was killed`;
+      return `GAUDMODE waiting-user role=${role} milestone=${milestone} workstream=gaud-poll summary=suspected-stuck: pane ${paneId} pane-dead - specialist exited or was killed`;
   }
 }
 
