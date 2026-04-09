@@ -43,7 +43,7 @@ export async function listPanes(): Promise<PaneInfo[]> {
  */
 export async function capturePane(paneId: string): Promise<string> {
   try {
-    return await $`tmux capture-pane -t ${paneId} -p -S -200`.text();
+    return await $`tmux capture-pane -t ${paneId} -p -J -S -200`.text();
   } catch {
     return "";
   }
@@ -54,7 +54,10 @@ export async function capturePane(paneId: string): Promise<string> {
  */
 export async function paneExists(paneId: string): Promise<boolean> {
   try {
-    await $`tmux has-session -t ${paneId}`.quiet();
+    const target = await $`tmux display-message -p -t ${paneId} '#{pane_id}'`.text();
+    if (!target.trim()) {
+      return false;
+    }
     return true;
   } catch {
     return false;

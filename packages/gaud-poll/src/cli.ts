@@ -3,6 +3,7 @@ import { parseArgs } from "util";
 import { GaudPoller, type PollEvent } from "./poller";
 import { listPanes } from "./tmux";
 import type { WatchedPane } from "./poller";
+import { parsePaneArg } from "./pane-args";
 
 const { values, positionals } = parseArgs({
   args: Bun.argv.slice(2),
@@ -136,6 +137,7 @@ async function runPollOnce() {
   }
 
   const poller = new GaudPoller({
+    conductorPane: (values.conductor as string) ?? null,
     onEvents: (events) => printEventsHuman(events),
   });
 
@@ -150,16 +152,7 @@ function parsePaneArgs(): WatchedPane[] {
   const paneArgs = values.pane as string[] | undefined;
   if (!paneArgs) return [];
 
-  return paneArgs.map((arg) => {
-    // Format: paneId:role:expectedCommand or just paneId
-    const parts = arg.split(":");
-    return {
-      paneId: parts[0],
-      role: parts[1] ?? "unknown",
-      milestone: "current",
-      expectedCommand: parts[2] ?? "unknown",
-    };
-  });
+  return paneArgs.map(parsePaneArg);
 }
 
 function printEventsHuman(events: PollEvent[]) {
