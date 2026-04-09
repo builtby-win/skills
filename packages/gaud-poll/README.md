@@ -25,6 +25,16 @@ This compiles a self-contained binary at `bin/gaud-poll` — no runtime needed t
 
 The orchestrator launches gaud-poll with its own pane ID as `--conductor`. When gaud-poll detects a callback, stuck pane, or dead pane, it sends a `GAUDMODE` message directly to the conductor via `tmux-cli send`.
 
+For pane-health problems, gaud-poll uses the existing `GAUDMODE waiting-user`
+envelope with a reserved summary prefix:
+
+```text
+GAUDMODE waiting-user role=<role> milestone=<milestone> workstream=gaud-poll summary=suspected-stuck: ...
+```
+
+This keeps the top-level callback verbs stable while letting the conductor treat
+`suspected-stuck:` as a machine-detectable pane-health/debug signal.
+
 ```bash
 gaud-poll watch \
   -c %0 \
@@ -52,15 +62,16 @@ gaud-poll watch \
 
 ```bash
 gaud-poll poll -p %5:Implementer:codex
+gaud-poll poll -p gaud:1.2:Implementer:codex
 ```
 
 ## Pane format
 
 ```
-<pane_id>:<role>:<expected_command>
+<pane_target>:<role>:<expected_command>
 ```
 
-- `pane_id` — tmux pane ID (e.g. `%5`)
+- `pane_target` — tmux pane ID (e.g. `%5`) or full tmux target (e.g. `gaud:1.2`)
 - `role` — gaud role name (e.g. `Implementer`, `Integrator`, `UX/UI`)
 - `expected_command` — the CLI the pane should be running (e.g. `codex`, `opencode`, `claude`)
 
@@ -90,3 +101,5 @@ This means the conductor gets callbacks even when:
 - The specialist's `tmux-cli send` fired but Enter was dropped
 - The specialist exited without sending a callback
 - The specialist is stuck on an error
+
+Worker callbacks are preserved in the same `GAUDMODE ... role=... milestone=... workstream=... summary=...` shape they were instructed to send so the conductor can key off one stable contract.
