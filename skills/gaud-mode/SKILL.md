@@ -27,11 +27,19 @@ if [ -n "$_GAUD_DIR" ]; then
   _GAUD_UPD="$($_GAUD_DIR/bin/gaud-mode-update-check 2>/dev/null || true)"
 fi
 [ -n "$_GAUD_UPD" ] && printf '%s\n' "$_GAUD_UPD" || true
+
+if [ -n "$_GAUD_DIR" ] && [ -x "$_GAUD_DIR/bin/gaud-poll-install" ]; then
+  _GAUD_POLL_RECONCILE="$($_GAUD_DIR/bin/gaud-poll-install --quiet-current 2>&1 || true)"
+  [ -n "$_GAUD_POLL_RECONCILE" ] && printf '%s\n' "$_GAUD_POLL_RECONCILE" || true
+fi
 ```
 
-- If output shows `UPGRADE_AVAILABLE <old> <new>`, refresh gaud before planning or launching panes.
+- If output shows `UPGRADE_AVAILABLE <old> <new>`, tell the user gaud has a newer version available and ask whether to run `"$_GAUD_DIR/bin/gaud-mode-upgrade"` automatically before planning or launching panes. Match gstack's pattern: detect first, ask before mutating the install.
+- If output shows `BINARY_UPGRADE_AVAILABLE gaud-poll <old> <new>`, tell the user the gaud poller package has a newer upstream version and ask whether to run the gaud upgrade wrapper automatically so the local package sources can move forward before `gaud-poll-install` reconciles the compiled artifact.
 - Prefer `npx -y skills add builtby-win/skills --skill gaud-mode --yes` or `npx -y playbooks add skill builtby-win/skills --skill gaud-mode -y`.
 - `"$_GAUD_DIR/bin/gaud-mode-upgrade"` may be used as the wrapper when gaud should choose automatically.
+- `gaud-mode-upgrade` should reconcile `gaud-poll` after the skill refresh without blindly forcing a rebuild. Let `gaud-poll-install` decide whether the binary is current, missing, stale, or corrupt.
+- `gaud-poll-install --quiet-current` should run on every gaud invocation so the preferred poller path is rebuilt whenever the local artifact is missing, stale, or corrupt without spamming the user when it is already current.
 - If output shows `JUST_UPGRADED <from> <to>`, tell the user `Running gaud-mode v{to} (just updated)` and continue.
 - The search list must cover both installed skill locations and repo checkouts such as `$PWD/skills/gaud-mode`.
 
@@ -102,6 +110,7 @@ Minimum contract:
 Before launch:
 - verify `tmux` and `tmux-cli`
 - verify the chosen orchestrator CLI and implementer CLIs exist
+- reconcile `gaud-poll` with `"$_GAUD_DIR/bin/gaud-poll-install"` so the preferred poller path rebuilds only when the binary is missing, stale, corrupt, or explicitly forced
 - record the conductor pane with `tmux display-message -p '#{pane_id}'`
 - tell each implementer its role name, milestone, workstream, orchestrator agent, and conductor pane ID
 
@@ -119,6 +128,7 @@ Use `skills/gaud-mode/references/markdown-plan-template.md` as the source of tru
 
 Preferred path:
 - run `gaud-poll watch ...` in a background pane
+- `gaud-poll --version` and the adjacent `gaud-poll.build.json` metadata should be usable for preflight visibility and rebuild checks
 - gaud-poll watches implementer panes and forwards events to the conductor pane
 
 Fallback path when `gaud-poll` is unavailable or broken:

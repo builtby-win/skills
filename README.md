@@ -56,6 +56,22 @@ or `npx playbooks` rather than hand-editing the installed copy. That preflight
 must work both from installed skill locations and from a repo checkout such as
 `$PWD/skills/gaud-mode`.
 
+When that preflight reports `UPGRADE_AVAILABLE`, gaud should ask the user
+whether to run `skills/gaud-mode/bin/gaud-mode-upgrade` automatically before
+continuing, following the same pattern as gstack: detect first, ask before
+mutating the install.
+
+That same preflight should also detect companion binary drift for required gaud
+artifacts, starting with `gaud-poll`, by comparing the local package version to
+the canonical upstream `packages/gaud-poll/package.json` version and then
+running `skills/gaud-mode/bin/gaud-poll-install --quiet-current` so the local
+compiled binary is rebuilt only when missing, stale, or corrupt.
+
+When that binary preflight reports `BINARY_UPGRADE_AVAILABLE gaud-poll <old>
+<new>`, gaud should ask the user whether to run the gaud upgrade wrapper first
+so the local skill checkout can update before the binary reconcile step rebuilds
+from current local sources.
+
 Canonical skill name:
 - `gaud-mode`
 
