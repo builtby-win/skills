@@ -116,7 +116,7 @@ install_gaud_poll() {
     return 0
   fi
 
-  if "$install_script" --force; then
+  if "$install_script"; then
     return 0
   fi
 

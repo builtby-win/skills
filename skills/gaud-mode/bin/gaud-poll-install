@@ -5,18 +5,23 @@ set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FORCE_REBUILD=0
+QUIET_CURRENT=0
 
-case "${1:-}" in
-  --force)
-    FORCE_REBUILD=1
-    ;;
-  "")
-    ;;
-  *)
-    echo "ERROR: unknown argument: ${1}" >&2
-    exit 1
-    ;;
-esac
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --force)
+      FORCE_REBUILD=1
+      ;;
+    --quiet-current)
+      QUIET_CURRENT=1
+      ;;
+    *)
+      echo "ERROR: unknown argument: ${1}" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 # Resolve package dir: works whether installed under skills/ or packages/
 # Installed path:  ~/.claude/skills/gaud-mode  → look for sibling gaud-poll package
@@ -42,23 +47,141 @@ PKG_DIR="$(find_package_dir)" || {
 }
 
 BIN="$PKG_DIR/bin/gaud-poll"
+BUILD_INFO="$PKG_DIR/bin/gaud-poll.build.json"
+BUILD_HELPER="$PKG_DIR/scripts/build-gaud-poll.ts"
+REBUILD_REASON=""
+CURRENT_STATE_MESSAGE=""
+CURRENT_ONLY=0
+
+json_field() {
+  JSON_INPUT="$1" FIELD_NAME="$2" python3 - <<'PY'
+import json
+import os
+
+json_input = os.environ.get("JSON_INPUT", "")
+field_name = os.environ.get("FIELD_NAME", "")
+
+try:
+    value = json.loads(json_input).get(field_name)
+except Exception:
+    value = None
+
+if isinstance(value, str):
+    print(value, end="")
+PY
+}
+
+binary_reports_version() {
+  local expected_version output
+  expected_version="$1"
+
+  if [ ! -x "$BIN" ]; then
+    return 1
+  fi
+
+  if ! output="$("$BIN" --version 2>/dev/null)"; then
+    return 1
+  fi
+
+  [ "$(printf '%s' "$output" | tr -d '\r\n')" = "gaud-poll $expected_version" ]
+}
+
+needs_rebuild() {
+  local built_info built_fingerprint built_version current_fingerprint current_info current_version
+
+  if [ "$FORCE_REBUILD" -eq 1 ]; then
+    REBUILD_REASON="forced"
+    return 0
+  fi
+
+  if [ ! -x "$BIN" ]; then
+    REBUILD_REASON="binary missing"
+    return 0
+  fi
+
+  if [ ! -f "$BUILD_INFO" ]; then
+    REBUILD_REASON="metadata missing"
+    return 0
+  fi
+
+  if [ ! -f "$BUILD_HELPER" ]; then
+    REBUILD_REASON="build helper missing"
+    return 0
+  fi
+
+  if ! command -v bun >/dev/null 2>&1; then
+    built_info="$(cat "$BUILD_INFO")"
+    built_version="$(json_field "$built_info" version)"
+    if [ -z "$built_version" ]; then
+      REBUILD_REASON="metadata corrupt"
+      return 0
+    fi
+
+    if ! binary_reports_version "$built_version"; then
+      REBUILD_REASON="binary corrupt"
+      return 0
+    fi
+
+    CURRENT_STATE_MESSAGE="gaud-poll already current at $BIN (bun unavailable; skipped source fingerprint check)"
+    return 1
+  fi
+
+  if ! current_info="$(bun "$BUILD_HELPER" --print-current)"; then
+    REBUILD_REASON="unable to compute current build info"
+    return 0
+  fi
+
+  built_info="$(cat "$BUILD_INFO")"
+  current_version="$(json_field "$current_info" version)"
+  current_fingerprint="$(json_field "$current_info" fingerprint)"
+  built_version="$(json_field "$built_info" version)"
+  built_fingerprint="$(json_field "$built_info" fingerprint)"
+
+  if [ -z "$built_version" ] || [ -z "$built_fingerprint" ]; then
+    REBUILD_REASON="metadata corrupt"
+    return 0
+  fi
+
+  if ! binary_reports_version "$current_version"; then
+    REBUILD_REASON="binary corrupt"
+    return 0
+  fi
+
+  if [ "$built_version" != "$current_version" ]; then
+    REBUILD_REASON="version mismatch"
+    return 0
+  fi
+
+  if [ "$built_fingerprint" != "$current_fingerprint" ]; then
+    REBUILD_REASON="fingerprint mismatch"
+    return 0
+  fi
+
+  CURRENT_STATE_MESSAGE="gaud-poll already current at $BIN"
+  return 1
+}
 
 if [ "$FORCE_REBUILD" -eq 1 ] && [ -e "$BIN" ]; then
   rm -f "$BIN"
 fi
 
-if [ "$FORCE_REBUILD" -eq 0 ] && [ -x "$BIN" ]; then
-  echo "gaud-poll already built at $BIN"
+if ! needs_rebuild; then
+  CURRENT_ONLY=1
+  if [ "$QUIET_CURRENT" -eq 0 ]; then
+    echo "$CURRENT_STATE_MESSAGE"
+  fi
 else
   if ! command -v bun >/dev/null 2>&1; then
     echo "ERROR: bun is required to build gaud-poll. Install from https://bun.sh" >&2
     exit 1
   fi
-  if [ "$FORCE_REBUILD" -eq 1 ]; then
-    echo "Rebuilding gaud-poll..."
+
+  if [ "$FORCE_REBUILD" -eq 1 ] || [ -e "$BIN" ] || [ -e "$BUILD_INFO" ]; then
+    echo "Rebuilding gaud-poll...${REBUILD_REASON:+ ($REBUILD_REASON)}"
   else
-    echo "Building gaud-poll..."
+    echo "Building gaud-poll...${REBUILD_REASON:+ ($REBUILD_REASON)}"
   fi
+
   (cd "$PKG_DIR" && bun install --frozen-lockfile && bun run build)
   echo "Built: $BIN"
 fi
@@ -72,10 +195,14 @@ elif echo ":$PATH:" | grep -q ":$HOME/bin:"; then
 else
   mkdir -p "$HOME/.local/bin"
   LINK_DIR="$HOME/.local/bin"
-  echo "NOTE: Add $HOME/.local/bin to your PATH"
+  if [ "$QUIET_CURRENT" -eq 0 ] || [ "$CURRENT_ONLY" -eq 0 ]; then
+    echo "NOTE: Add $HOME/.local/bin to your PATH"
+  fi
 fi
 
 mkdir -p "$LINK_DIR"
 ln -sf "$BIN" "$LINK_DIR/gaud-poll"
-echo "Linked: $LINK_DIR/gaud-poll → $BIN"
-echo "gaud-poll install complete."
+if [ "$QUIET_CURRENT" -eq 0 ] || [ "$CURRENT_ONLY" -eq 0 ]; then
+  echo "Linked: $LINK_DIR/gaud-poll → $BIN"
+  echo "gaud-poll install complete."
+fi
