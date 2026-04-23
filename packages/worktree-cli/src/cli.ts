@@ -10,9 +10,11 @@
  *   npx @builtby.win/worktree info <issue-number>
  */
 
+import { readFileSync } from 'node:fs'
+
 import { createWorktree, deleteWorktree, listWorktrees, showWorktreeInfo } from './index.js'
 
-const VERSION = '0.1.0'
+const VERSION = readPackageVersion()
 
 function printHelp(): void {
   console.log(`
@@ -155,6 +157,18 @@ async function main(): Promise<void> {
     console.error(`\n❌ Error: ${error instanceof Error ? error.message : error}\n`)
     process.exit(1)
   }
+}
+
+function readPackageVersion(): string {
+  const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    version?: string
+  }
+
+  if (!packageJson.version) {
+    throw new Error('Missing version in package.json')
+  }
+
+  return packageJson.version
 }
 
 main()
