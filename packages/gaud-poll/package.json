@@ -11,8 +11,9 @@
   },
   "type": "module",
   "scripts": {
-    "build": "bun build --compile src/cli.ts --outfile bin/gaud-poll",
-    "dev": "bun run src/cli.ts"
+    "build": "bun run scripts/build-gaud-poll.ts",
+    "dev": "bun run src/cli.ts",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0"

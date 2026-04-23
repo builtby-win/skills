@@ -5,6 +5,7 @@ import { listPanes } from "./tmux";
 import type { WatchedPane } from "./poller";
 import { parsePaneArg } from "./pane-args";
 import { StatusLine } from "./status-line";
+import { getBuildInfo } from "./version";
 
 type Logger = (message: string) => void;
 
@@ -12,6 +13,7 @@ const { values, positionals } = parseArgs({
   args: Bun.argv.slice(2),
   options: {
     help: { type: "boolean", short: "h" },
+    version: { type: "boolean", short: "v" },
     interval: { type: "string", short: "i", default: "30" },
     output: { type: "string", short: "o" },
     pane: { type: "string", multiple: true, short: "p" },
@@ -26,6 +28,12 @@ const { values, positionals } = parseArgs({
 
 if (values.help) {
   printUsage();
+  process.exit(0);
+}
+
+if (values.version) {
+  const info = await getBuildInfo();
+  console.log(`gaud-poll ${info.version}`);
   process.exit(0);
 }
 
@@ -206,6 +214,7 @@ OPTIONS:
   -o, --output <file>         Write events as JSONL to file (default: stdout)
   -s, --scan                  Scan all panes (alias for scan command)
   -h, --help                  Show this help
+  -v, --version               Show gaud-poll version
 
 PANE FORMAT:
   <pane_id>:<role>:<expected_command>
