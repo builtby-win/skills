@@ -7,6 +7,7 @@ STATE_DIR="${GAUD_MODE_STATE_DIR:-$HOME/.gaud-mode}"
 MARKER_FILE="$STATE_DIR/just-upgraded-from"
 VERSION_FILE="$SKILL_DIR/VERSION"
 REMOTE_URL="https://raw.githubusercontent.com/builtby-win/skills/main/skills/gaud-mode/VERSION"
+GAUD_POLL_REMOTE_PACKAGE_URL="https://raw.githubusercontent.com/builtby-win/skills/main/packages/gaud-poll/package.json"
 
 LOCAL=""
 if [ -f "$VERSION_FILE" ]; then
@@ -35,4 +36,50 @@ fi
 
 if [ "$LOCAL" != "$REMOTE" ]; then
   printf 'UPGRADE_AVAILABLE %s %s\n' "$LOCAL" "$REMOTE"
+fi
+
+find_gaud_poll_package_dir() {
+  local candidates=(
+    "$SKILL_DIR/../../../packages/gaud-poll"
+    "$SKILL_DIR/../../packages/gaud-poll"
+    "$SKILL_DIR/../gaud-poll"
+  )
+
+  for d in "${candidates[@]}"; do
+    if [ -f "$d/package.json" ]; then
+      echo "$(cd "$d" && pwd)"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+json_version() {
+  JSON_INPUT="$1" python3 - <<'PY'
+import json
+import os
+
+try:
+    data = json.loads(os.environ.get("JSON_INPUT", ""))
+except Exception:
+    data = {}
+
+value = data.get("version")
+if isinstance(value, str):
+    print(value.strip(), end="")
+PY
+}
+
+GAUD_POLL_PACKAGE_DIR="$(find_gaud_poll_package_dir 2>/dev/null || true)"
+if [ -n "$GAUD_POLL_PACKAGE_DIR" ] && [ -f "$GAUD_POLL_PACKAGE_DIR/package.json" ]; then
+  GAUD_POLL_LOCAL="$(json_version "$(cat "$GAUD_POLL_PACKAGE_DIR/package.json")")"
+  if printf '%s' "$GAUD_POLL_LOCAL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    GAUD_POLL_REMOTE="$(curl -fsSL --max-time 5 "$GAUD_POLL_REMOTE_PACKAGE_URL" 2>/dev/null || true)"
+    GAUD_POLL_REMOTE="$(json_version "$GAUD_POLL_REMOTE")"
+
+    if printf '%s' "$GAUD_POLL_REMOTE" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' && [ "$GAUD_POLL_LOCAL" != "$GAUD_POLL_REMOTE" ]; then
+      printf 'BINARY_UPGRADE_AVAILABLE gaud-poll %s %s\n' "$GAUD_POLL_LOCAL" "$GAUD_POLL_REMOTE"
+    fi
+  fi
 fi
