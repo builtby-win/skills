@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Install gaud-poll binary. Finds the package relative to this skill's location,
-# builds it with bun, and symlinks it into ~/.local/bin (or ~/bin as fallback).
+# Install gaud-poll binary.
+#
+# Two sources, in priority order:
+#   1. Source package (packages/gaud-poll/)  — build with bun
+#   2. Shipped binary (skills/gaud-mode/bin/gaud-poll) — pre-compiled, shipped with skill
+#
+# Symlinks the result into ~/.local/bin (or ~/bin as fallback).
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -23,9 +28,55 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-# Resolve package dir: works whether installed under skills/ or packages/
-# Installed path:  ~/.claude/skills/gaud-mode  → look for sibling gaud-poll package
-# Repo path:       skills/gaud-mode             → packages/gaud-poll
+# ── helpers ──────────────────────────────────────────────────────────
+
+json_field() {
+  JSON_INPUT="$1" FIELD_NAME="$2" python3 - <<'PY'
+import json, os
+value = json.loads(os.environ.get("JSON_INPUT", "{}")).get(os.environ.get("FIELD_NAME", ""))
+if isinstance(value, str): print(value, end="")
+PY
+}
+
+binary_reports_version() {
+  local bin_path="$1" expected_version="$2"
+  local output
+  if [ ! -x "$bin_path" ]; then return 1; fi
+  if ! output="$("$bin_path" --version 2>/dev/null)"; then return 1; fi
+  [ "$(printf '%s' "$output" | tr -d '\r\n')" = "gaud-poll $expected_version" ]
+}
+
+read_build_version() {
+  local info_file="$1"
+  if [ ! -f "$info_file" ]; then return 1; fi
+  json_field "$(cat "$info_file")" version
+}
+
+# ── symlink to PATH ─────────────────────────────────────────────────
+
+link_to_path() {
+  local source_bin="$1"
+  local link_dir=""
+  if echo ":$PATH:" | grep -q ":$HOME/.local/bin:"; then
+    link_dir="$HOME/.local/bin"
+  elif echo ":$PATH:" | grep -q ":$HOME/bin:"; then
+    link_dir="$HOME/bin"
+  else
+    mkdir -p "$HOME/.local/bin"
+    link_dir="$HOME/.local/bin"
+    if [ "$QUIET_CURRENT" -eq 0 ] || [ "$CURRENT_ONLY" -eq 0 ]; then
+      echo "NOTE: Add $HOME/.local/bin to your PATH"
+    fi
+  fi
+  mkdir -p "$link_dir"
+  ln -sf "$source_bin" "$link_dir/gaud-poll"
+  if [ "$QUIET_CURRENT" -eq 0 ] || [ "$CURRENT_ONLY" -eq 0 ]; then
+    echo "Linked: $link_dir/gaud-poll → $source_bin"
+  fi
+}
+
+# ── Source-package build path ────────────────────────────────────────
+
 find_package_dir() {
   local candidates=(
     "$SKILL_DIR/../../../packages/gaud-poll"
@@ -41,168 +92,175 @@ find_package_dir() {
   return 1
 }
 
-PKG_DIR="$(find_package_dir)" || {
-  echo "ERROR: gaud-poll package not found relative to $SKILL_DIR" >&2
-  exit 1
-}
+build_from_source() {
+  local pkg_dir="$1"
+  local bin="$pkg_dir/bin/gaud-poll"
+  local build_info="$pkg_dir/bin/gaud-poll.build.json"
+  local build_helper="$pkg_dir/scripts/build-gaud-poll.ts"
 
-BIN="$PKG_DIR/bin/gaud-poll"
-BUILD_INFO="$PKG_DIR/bin/gaud-poll.build.json"
-BUILD_HELPER="$PKG_DIR/scripts/build-gaud-poll.ts"
-REBUILD_REASON=""
-CURRENT_STATE_MESSAGE=""
-CURRENT_ONLY=0
-
-json_field() {
-  JSON_INPUT="$1" FIELD_NAME="$2" python3 - <<'PY'
-import json
-import os
-
-json_input = os.environ.get("JSON_INPUT", "")
-field_name = os.environ.get("FIELD_NAME", "")
-
-try:
-    value = json.loads(json_input).get(field_name)
-except Exception:
-    value = None
-
-if isinstance(value, str):
-    print(value, end="")
-PY
-}
-
-binary_reports_version() {
-  local expected_version output
-  expected_version="$1"
-
-  if [ ! -x "$BIN" ]; then
-    return 1
+  if [ "$FORCE_REBUILD" -eq 1 ] && [ -e "$bin" ]; then
+    rm -f "$bin"
   fi
 
-  if ! output="$("$BIN" --version 2>/dev/null)"; then
-    return 1
-  fi
-
-  [ "$(printf '%s' "$output" | tr -d '\r\n')" = "gaud-poll $expected_version" ]
-}
-
-needs_rebuild() {
-  local built_info built_fingerprint built_version current_fingerprint current_info current_version
+  local rebuild_reason=""
+  local current_state=""
 
   if [ "$FORCE_REBUILD" -eq 1 ]; then
-    REBUILD_REASON="forced"
-    return 0
-  fi
-
-  if [ ! -x "$BIN" ]; then
-    REBUILD_REASON="binary missing"
-    return 0
-  fi
-
-  if [ ! -f "$BUILD_INFO" ]; then
-    REBUILD_REASON="metadata missing"
-    return 0
-  fi
-
-  if [ ! -f "$BUILD_HELPER" ]; then
-    REBUILD_REASON="build helper missing"
-    return 0
-  fi
-
-  if ! command -v bun >/dev/null 2>&1; then
-    built_info="$(cat "$BUILD_INFO")"
-    built_version="$(json_field "$built_info" version)"
+    rebuild_reason="forced"
+  elif [ ! -x "$bin" ]; then
+    rebuild_reason="binary missing"
+  elif [ ! -f "$build_info" ]; then
+    rebuild_reason="metadata missing"
+  elif [ ! -f "$build_helper" ]; then
+    rebuild_reason="build helper missing"
+  elif ! command -v bun >/dev/null 2>&1; then
+    local built_version
+    built_version="$(read_build_version "$build_info")"
     if [ -z "$built_version" ]; then
-      REBUILD_REASON="metadata corrupt"
-      return 0
+      rebuild_reason="metadata corrupt"
+    elif ! binary_reports_version "$bin" "$built_version"; then
+      rebuild_reason="binary corrupt"
+    else
+      current_state="gaud-poll already current at $bin (bun unavailable; skipped source fingerprint check)"
     fi
+  else
+    local current_info current_fingerprint current_version
+    local built_info built_fingerprint built_version
 
-    if ! binary_reports_version "$built_version"; then
-      REBUILD_REASON="binary corrupt"
-      return 0
+    if ! current_info="$(bun "$build_helper" --print-current 2>/dev/null)"; then
+      rebuild_reason="unable to compute current build info"
+    else
+      built_info="$(cat "$build_info")"
+      current_version="$(json_field "$current_info" version)"
+      current_fingerprint="$(json_field "$current_info" fingerprint)"
+      built_version="$(json_field "$built_info" version)"
+      built_fingerprint="$(json_field "$built_info" fingerprint)"
+
+      if [ -z "$built_version" ] || [ -z "$built_fingerprint" ]; then
+        rebuild_reason="metadata corrupt"
+      elif ! binary_reports_version "$bin" "$current_version"; then
+        rebuild_reason="binary corrupt"
+      elif [ "$built_version" != "$current_version" ]; then
+        rebuild_reason="version mismatch"
+      elif [ "$built_fingerprint" != "$current_fingerprint" ]; then
+        rebuild_reason="fingerprint mismatch"
+      else
+        current_state="gaud-poll already current at $bin"
+      fi
     fi
+  fi
 
-    CURRENT_STATE_MESSAGE="gaud-poll already current at $BIN (bun unavailable; skipped source fingerprint check)"
+  if [ -n "$current_state" ]; then
+    if [ "$QUIET_CURRENT" -eq 0 ]; then
+      echo "$current_state"
+    fi
+    link_to_path "$bin"
+    return 0
+  fi
+
+  # Rebuild needed
+  if ! command -v bun >/dev/null 2>&1; then
+    echo "ERROR: bun is required to build gaud-poll from source. Install from https://bun.sh" >&2
     return 1
   fi
 
-  if ! current_info="$(bun "$BUILD_HELPER" --print-current)"; then
-    REBUILD_REASON="unable to compute current build info"
-    return 0
+  if [ -e "$bin" ] || [ -e "$build_info" ]; then
+    echo "Rebuilding gaud-poll...${rebuild_reason:+ ($rebuild_reason)}"
+  else
+    echo "Building gaud-poll...${rebuild_reason:+ ($rebuild_reason)}"
   fi
 
-  built_info="$(cat "$BUILD_INFO")"
-  current_version="$(json_field "$current_info" version)"
-  current_fingerprint="$(json_field "$current_info" fingerprint)"
-  built_version="$(json_field "$built_info" version)"
-  built_fingerprint="$(json_field "$built_info" fingerprint)"
-
-  if [ -z "$built_version" ] || [ -z "$built_fingerprint" ]; then
-    REBUILD_REASON="metadata corrupt"
-    return 0
-  fi
-
-  if ! binary_reports_version "$current_version"; then
-    REBUILD_REASON="binary corrupt"
-    return 0
-  fi
-
-  if [ "$built_version" != "$current_version" ]; then
-    REBUILD_REASON="version mismatch"
-    return 0
-  fi
-
-  if [ "$built_fingerprint" != "$current_fingerprint" ]; then
-    REBUILD_REASON="fingerprint mismatch"
-    return 0
-  fi
-
-  CURRENT_STATE_MESSAGE="gaud-poll already current at $BIN"
-  return 1
+  (cd "$pkg_dir" && bun install --frozen-lockfile && bun run build)
+  echo "Built: $bin"
+  link_to_path "$bin"
+  return 0
 }
 
-if [ "$FORCE_REBUILD" -eq 1 ] && [ -e "$BIN" ]; then
-  rm -f "$BIN"
-fi
+# ── Shipped-binary path ──────────────────────────────────────────────
 
-if ! needs_rebuild; then
-  CURRENT_ONLY=1
-  if [ "$QUIET_CURRENT" -eq 0 ]; then
-    echo "$CURRENT_STATE_MESSAGE"
+decompress_shipped_binary() {
+  local compressed="$1"
+  local target="${compressed%.gz}"
+  local build_info="${target}.build.json"
+
+  echo "Decompressing gaud-poll shipped binary..."
+  if ! gunzip -c "$compressed" > "$target" 2>/dev/null; then
+    echo "ERROR: failed to decompress $compressed" >&2
+    return 1
   fi
+  chmod +x "$target"
+
+  local shipped_version
+  shipped_version="$(read_build_version "$build_info" 2>/dev/null || true)"
+  if [ -z "$shipped_version" ]; then
+    echo "ERROR: gaud-poll shipped binary has no valid build metadata (expected at $build_info)" >&2
+    return 1
+  fi
+
+  if ! binary_reports_version "$target" "$shipped_version"; then
+    echo "ERROR: gaud-poll shipped binary decompressed but reports wrong version (expected gaud-poll $shipped_version)" >&2
+    return 1
+  fi
+
+  if [ "$QUIET_CURRENT" -eq 0 ]; then
+    echo "gaud-poll ready at $target (v${shipped_version}, shipped with skill)"
+  fi
+  link_to_path "$target"
+  return 0
+}
+
+use_shipped_binary() {
+  local shipped_bin="$1"
+  local shipped_build_info="${shipped_bin}.build.json"
+  local shipped_version
+  shipped_version="$(read_build_version "$shipped_build_info" 2>/dev/null || true)"
+
+  if [ -z "$shipped_version" ]; then
+    echo "ERROR: gaud-poll shipped binary has no valid build metadata (expected at $shipped_build_info)" >&2
+    return 1
+  fi
+
+  if ! binary_reports_version "$shipped_bin" "$shipped_version"; then
+    echo "ERROR: gaud-poll shipped binary is corrupt or reports wrong version (expected gaud-poll $shipped_version)" >&2
+    return 1
+  fi
+
+  if [ "$QUIET_CURRENT" -eq 0 ]; then
+    echo "gaud-poll already current at $shipped_bin (v${shipped_version}, shipped with skill)"
+  fi
+  link_to_path "$shipped_bin"
+  return 0
+}
+
+# ── main ─────────────────────────────────────────────────────────────
+
+CURRENT_ONLY=0
+PKG_DIR="$(find_package_dir 2>/dev/null || true)"
+
+if [ -n "$PKG_DIR" ]; then
+  # Source package available → build from source
+  build_from_source "$PKG_DIR"
 else
-  if ! command -v bun >/dev/null 2>&1; then
-    echo "ERROR: bun is required to build gaud-poll. Install from https://bun.sh" >&2
+  # Source package not found → use shipped binary (compressed or uncompressed)
+  SHIPPED_BIN="$SKILL_DIR/bin/gaud-poll"
+  SHIPPED_GZ="${SHIPPED_BIN}.gz"
+  if [ -x "$SHIPPED_BIN" ]; then
+    use_shipped_binary "$SHIPPED_BIN"
+  elif [ -f "$SHIPPED_GZ" ]; then
+    decompress_shipped_binary "$SHIPPED_GZ"
+  else
+    echo "ERROR: gaud-poll package not found and no shipped binary at $SHIPPED_BIN or $SHIPPED_GZ" >&2
+    echo "" >&2
+    echo "To build from source, ensure the gaud-poll source package is available" >&2
+    echo "at one of these locations relative to $SKILL_DIR:" >&2
+    echo "  ../../packages/gaud-poll   (repo checkout)" >&2
+    echo "  ../gaud-poll               (sibling dir)" >&2
+    echo "" >&2
+    echo "Or reinstall gaud-mode to get the shipped binary." >&2
     exit 1
   fi
-
-  if [ "$FORCE_REBUILD" -eq 1 ] || [ -e "$BIN" ] || [ -e "$BUILD_INFO" ]; then
-    echo "Rebuilding gaud-poll...${REBUILD_REASON:+ ($REBUILD_REASON)}"
-  else
-    echo "Building gaud-poll...${REBUILD_REASON:+ ($REBUILD_REASON)}"
-  fi
-
-  (cd "$PKG_DIR" && bun install --frozen-lockfile && bun run build)
-  echo "Built: $BIN"
 fi
 
-# Symlink into PATH
-LINK_DIR=""
-if echo ":$PATH:" | grep -q ":$HOME/.local/bin:"; then
-  LINK_DIR="$HOME/.local/bin"
-elif echo ":$PATH:" | grep -q ":$HOME/bin:"; then
-  LINK_DIR="$HOME/bin"
-else
-  mkdir -p "$HOME/.local/bin"
-  LINK_DIR="$HOME/.local/bin"
-  if [ "$QUIET_CURRENT" -eq 0 ] || [ "$CURRENT_ONLY" -eq 0 ]; then
-    echo "NOTE: Add $HOME/.local/bin to your PATH"
-  fi
-fi
-
-mkdir -p "$LINK_DIR"
-ln -sf "$BIN" "$LINK_DIR/gaud-poll"
-if [ "$QUIET_CURRENT" -eq 0 ] || [ "$CURRENT_ONLY" -eq 0 ]; then
-  echo "Linked: $LINK_DIR/gaud-poll → $BIN"
+if [ "$QUIET_CURRENT" -eq 0 ] && [ "$CURRENT_ONLY" -eq 0 ]; then
   echo "gaud-poll install complete."
 fi

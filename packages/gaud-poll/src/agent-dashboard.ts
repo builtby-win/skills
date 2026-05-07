@@ -1,4 +1,5 @@
 import type { PollEvent, WatchedPane } from "./poller";
+import { appendFile } from "node:fs/promises";
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const FRAME_INTERVAL_MS = 100;
@@ -23,12 +24,14 @@ interface AgentRow {
 export interface AgentDashboardOptions {
   title?: string;
   tmuxSocketName?: string | null;
+  logFilePath?: string | null;
 }
 
 export class AgentDashboard {
   private readonly enabled: boolean;
   private readonly title: string;
   private readonly tmuxSocketName: string | null;
+  private readonly logFilePath: string | null;
   private readonly agents = new Map<string, AgentRow>();
   private frame = 0;
   private phase: Phase = "idle";
@@ -43,6 +46,7 @@ export class AgentDashboard {
     this.enabled = Boolean(process.stderr.isTTY);
     this.title = options.title ?? "gaud";
     this.tmuxSocketName = options.tmuxSocketName ?? null;
+    this.logFilePath = options.logFilePath ?? null;
 
     const now = Date.now();
     for (const pane of panes) {
@@ -57,6 +61,17 @@ export class AgentDashboard {
         updatedAt: now,
       });
     }
+
+    if (this.logFilePath) {
+      this.writeLog(`gaud-poll dashboard started (title=${this.title}, panes=${panes.length}, tty=${this.enabled})`);
+    }
+  }
+
+  private writeLog(message: string): void {
+    if (!this.logFilePath) return;
+    const timestamp = new Date().toISOString();
+    // Fire-and-forget; don't block rendering on disk writes
+    appendFile(this.logFilePath, `[${timestamp}] ${message}\n`, "utf8").catch(() => {});
   }
 
   start(): void {
@@ -64,6 +79,7 @@ export class AgentDashboard {
     process.stderr.write(HIDE_CURSOR);
     this.timer = setInterval(() => this.render(), FRAME_INTERVAL_MS);
     this.render();
+    this.writeLog("dashboard start (TUI enabled)");
   }
 
   stop(): void {
@@ -75,11 +91,13 @@ export class AgentDashboard {
       this.clearRenderedBlock();
       process.stderr.write(SHOW_CURSOR);
     }
+    this.writeLog("dashboard stop");
   }
 
   setPolling(): void {
     this.phase = "polling";
     this.pollStartedAt = Date.now();
+    this.writeLog("polling start");
 
     for (const agent of this.agents.values()) {
       if (agent.status === "starting") {
@@ -109,17 +127,20 @@ export class AgentDashboard {
           agent.status = callback.type === "done" ? "done" : "waiting";
           agent.detail = `${callback.workstream}: ${callback.summary}`;
           this.lastEvent = `${timeOf(event.timestamp)} ${agent.role} → ${callback.type}: ${callback.summary}`;
+          this.writeLog(`event callback role=${agent.role} pane=${event.paneId} type=${callback.type} summary=${callback.summary}`);
           break;
         }
         case "stuck":
           agent.status = "stuck";
           agent.detail = `${event.event.indicator.type}: ${event.event.indicator.detail}`;
           this.lastEvent = `${timeOf(event.timestamp)} ${agent.role} → stuck: ${event.event.indicator.type}`;
+          this.writeLog(`event stuck role=${agent.role} pane=${event.paneId} type=${event.event.indicator.type} detail=${event.event.indicator.detail}`);
           break;
         case "pane-dead":
           agent.status = "dead";
           agent.detail = "pane no longer exists";
           this.lastEvent = `${timeOf(event.timestamp)} ${agent.role} → dead`;
+          this.writeLog(`event pane-dead role=${agent.role} pane=${event.paneId}`);
           break;
       }
     }
@@ -129,6 +150,7 @@ export class AgentDashboard {
 
   log(message: string): void {
     this.lastEvent = message;
+    this.writeLog(`msg ${message}`);
     if (!this.enabled) {
       process.stderr.write(message + "\n");
       return;

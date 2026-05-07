@@ -82,6 +82,7 @@ upgrade_direct() {
   case "$remote_url" in
     *builtby-win/skills* )
       git -C "$repo_root" pull --ff-only origin "$REMOTE_BRANCH"
+      # Don't return — fall through to install_gaud_poll below
       return 0
       ;;
   esac

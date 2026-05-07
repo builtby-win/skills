@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 import { parseArgs } from "util";
-import { GaudPoller, type PollEvent } from "./poller";
+import { GaudPoller, type PollEvent, type WatchedPane } from "./poller";
 import { listPanes } from "./tmux";
-import type { WatchedPane } from "./poller";
 import { parsePaneArg } from "./pane-args";
 import { AgentDashboard } from "./agent-dashboard";
 import { getBuildInfo } from "./version";
@@ -19,6 +18,7 @@ const { values, positionals } = parseArgs({
     pane: { type: "string", multiple: true, short: "p" },
     conductor: { type: "string", short: "c" },
     "tmux-socket": { type: "string" },
+    "log-file": { type: "string" },
     title: { type: "string" },
     "poll-once": { type: "boolean" },
     watch: { type: "boolean", short: "w" },
@@ -107,7 +107,8 @@ async function runWatch() {
     );
   }
 
-  const dashboard = new AgentDashboard(panes, { title, tmuxSocketName });
+  const logFilePath = (values["log-file"] as string | undefined) ?? null;
+  const dashboard = new AgentDashboard(panes, { title, tmuxSocketName, logFilePath });
   const log: Logger = (msg) => dashboard.log(msg);
 
   const poller = new GaudPoller({
@@ -231,6 +232,7 @@ OPTIONS:
       --title <name>          Dashboard title (default: socket name or gaud)
   -i, --interval <seconds>    Polling interval (default: 30)
   -o, --output <file>         Write events as JSONL to file (default: stdout)
+      --log-file <file>       Write timestamped log entries to a file (for troubleshooting)
   -s, --scan                  Scan all panes (alias for scan command)
   -h, --help                  Show this help
   -v, --version               Show gaud-poll version
