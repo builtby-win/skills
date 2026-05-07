@@ -2,9 +2,8 @@
 .DS_Store
 Thumbs.db
 
-# Gaud-mode shipped binary (compressed version tracked instead)
+# Gaud-mode shipped binary (only the compressed version is in git)
 skills/gaud-mode/bin/gaud-poll
-!skills/gaud-mode/bin/gaud-poll.gz
 
 # Editor directories and files
 .idea/
