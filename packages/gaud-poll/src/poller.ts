@@ -1,4 +1,4 @@
-import { capturePane, paneExists, listPanes, sendToPane, type TmuxOptions } from "./tmux";
+import { capturePane, paneExists, listPanes, sendToPane, sendToPaneWithVerify, type TmuxOptions } from "./tmux";
 import {
   parseCallbacks,
   detectStuck,
@@ -235,10 +235,17 @@ export class GaudPoller {
       const message = formatEventForConductor(event);
       if (!message) continue;
 
-      const ok = await sendToPane(conductorPane, message);
-      if (!ok) {
+      // Use sendToPaneWithVerify so we detect and retry when Enter was
+      // swallowed — prevents the "text typed but never submitted" problem.
+      const verified = await sendToPaneWithVerify(conductorPane, message, {
+        maxRetries: 3,
+        retryDelayMs: 500,
+      });
+
+      // Log the result so the dashboard shows when a retry was needed
+      if (!verified) {
         console.error(
-          `gaud-poll: failed to forward event to conductor ${conductorPane}`
+          `gaud-poll: forwarded event to conductor ${conductorPane} but pane content did not change (Enter may not have been processed)`
         );
       }
     }

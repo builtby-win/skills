@@ -128,8 +128,9 @@ Decision rules:
 - Present the usage summary and suggested order before launching panes.
 - Ask the user which agents to use for this run when the usage data changes the obvious choice, when a preferred agent is depleted, or when multiple ready agents are close.
 - Default to the suggested ready agents if the user already gave a clear role map and no configured agent is blocked.
-- Do not stall on `unknown`; keep unknown agents available but lower-confidence, and pair them with a ready fallback when possible.
-- Do not launch `quota-blocked`, `rate-limited`, `auth-blocked`, or `unavailable` agents unless the user explicitly chooses them after seeing the summary.
+- Do not stall on any classification. Treat `auth-blocked` (CLI exists but missing credentials/OAuth) as `unknown` — the agent may still work for tasks that don't need that specific auth path. Treat `unavailable` (no CLI on PATH) as a hard block only when the CLI binary is not found at all.
+- When usage can't be checked (stale cache, no cache, probe error, missing OAuth), treat affected agents as `unknown` and proceed with the user's role map. Report what was found and flag uncertain agents, but do not block launch.
+- Keep `unknown` agents available but lower-confidence, and pair them with a ready fallback when possible.
 - Prefer agents with enough remaining quota and a near reset when the work fits; conserve agents below 20% unless they reset very soon or the user chooses them.
 
 Back2Vibing has the richest known usage probes today for Claude, Codex, Gemini, and Antigravity. OpenCode currently has no Back2Vibing quota probe, so treat it as `unknown` unless another usage source is supplied.
@@ -142,6 +143,8 @@ Before launch:
 - show the usage summary, including remaining percentage and reset timing, and ask the user for agent choices when the preflight makes the best map non-obvious
 - verify the chosen orchestrator CLI and implementer CLIs exist
 - reconcile `gaud-poll` with `"$_GAUD_DIR/bin/gaud-poll-install"` so the preferred poller path rebuilds only when the binary is missing, stale, corrupt, or explicitly forced
+- run `"$_GAUD_DIR/bin/gaud-tmux-layout" init --orchestrator <id>` to create the dashboard (`gaud`) and implementer (`impl`) windows
+- **launch `gaud-poll watch` in the dashboard pane** — use `"$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --window gaud --role poll --command 'gaud-poll watch ...'` to replace the placeholder shell with the live poller. This MUST happen before any implementer is launched. Verify the pane is running `gaud-poll` (not sitting at a shell prompt) before proceeding.
 - record the conductor pane with `tmux display-message -p '#{pane_id}'`
 - tell each implementer its role name, milestone, workstream, orchestrator agent, and conductor pane ID
 
@@ -162,6 +165,8 @@ Preferred path:
 - `gaud-poll --version` and the adjacent `gaud-poll.build.json` metadata should be usable for preflight visibility and rebuild checks
 - gaud-poll watches implementer panes and forwards events to the conductor pane
 - when using gaud's private tmux server, launch `gaud-poll` in the user's tmux session with `--tmux-socket gaud-<plan>` so callback forwarding still uses the user's conductor pane while implementer capture uses the private server
+- **Orchestrator pane monitoring**: gaud-poll sends callbacks to the conductor pane using explicit `tmux send-keys` for both the message text AND a separate `Enter` keystroke. After sending, it captures the pane content and verifies it changed (indicating Enter was processed). If the content is unchanged after 300ms, it resends Enter up to 3 times with exponential backoff. This prevents the "text typed but never submitted" problem when Enter is swallowed or the pane was not in an accepting state.
+- The orchestrator MUST run in the user's main tmux session (the one `gaud` was launched from), not in a private gaud-managed tmux server. gaud-poll runs in the same main session's dashboard pane. Since both the orchestrator pane and the gaud-poll pane are in the same tmux session, `tmux send-keys` can reach the orchestrator pane directly without needing a socket flag. If the orchestrator were in a different tmux server, callback forwarding would require crossing server boundaries.
 
 Fallback path when `gaud-poll` is unavailable or broken:
 - implementers send callbacks directly to the conductor pane with `tmux-cli send`
@@ -208,21 +213,32 @@ Layout contract:
 - Pane identity lives in the pane title: `<role>:<workstream>:<milestone>` (for example `impl:frontend:M1`, `poll:dark-mode:*`, `ux:dark-mode:M1`).
 - While gaud is running, the helper flips `renumber-windows on` for the session so retiring panes does not leave index gaps. The previous value is saved and restored on `end`.
 
-Typical call sequence:
+Mandatory call sequence (every bullet must execute, in order):
 
 ```bash
-# Once per orchestrator run
+# 1. Create dashboard (gaud) and implementer (impl) windows
 "$_GAUD_DIR/bin/gaud-tmux-layout" init --orchestrator <id>
 
-# Private implementer server named after the plan being executed
-tmux -L gaud-<plan> new-session -d -s <plan>
+# 2. Record the conductor pane ID BEFORE anything else uses it
+CONDUCTOR_PANE=$(tmux display-message -p '#{pane_id}')
 
-# gaud-poll lives in the user's tmux session dashboard window
+# 3. Start gaud-poll in the dashboard pane — this replaces the shell placeholder
 "$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --orchestrator <id> --window gaud \
   --role poll --workstream <id> --milestone '*' \
   --command 'gaud-poll watch --title <plan> --tmux-socket gaud-<plan> -c <conductor> -p <pane>:<role>:<cmd>'
 
-# Implementers live in gaud's private tmux server
+# 4. Verify the poller pane exists and has the right title before launching implementers
+GAUD_WIN=$("$_GAUD_DIR/bin/gaud-tmux-layout" list --orchestrator <id> | awk '/\[gaud\]/ {print $1}')
+POLLER_TITLE=$(tmux list-panes -t "$GAUD_WIN" -F '#{pane_title}' | head -1)
+case "$POLLER_TITLE" in
+  poll:*) ;;  # pane was tagged with --role poll → poller is live
+  *) echo "ERROR: dashboard pane is not running gaud-poll (title=$POLLER_TITLE). Run add-pane --window gaud --role poll first."; exit 1 ;;
+esac
+
+# 5. Private implementer server named after the plan
+tmux -L gaud-<plan> new-session -d -s <plan>
+
+# 6. Launch implementers in gaud's private tmux server
 tmux -L gaud-<plan> new-window -t <plan> -n impl-frontend \
   'B2V_DISABLED=true codex --yolo -m <model> "<kickoff prompt>"'
 
@@ -259,12 +275,25 @@ After an accepted milestone:
 - never skip the update check
 - never let implementers guess who the orchestrator is
 - never launch implementers without the real conductor pane ID
-- never skip the usage-aware agent preflight before launching panes
-- never silently launch a clearly depleted, auth-blocked, rate-limited, or unavailable agent when a healthier configured fallback exists
+- never skip the usage-aware agent preflight before launching panes; but do not let preflight failures or uncertain status block launch — report findings, flag uncertain agents, and proceed
+- prefer the healthiest available configured agent per role; when all configured agents are uncertain (unknown/auth-blocked/unchecked), launch with the user's chosen role map and handle runtime failures by retrying with a fallback agent
+- never launch implementers without a live `gaud-poll watch` in the dashboard pane; the `gaud` window's first pane must have a `pane_title` matching `poll:*` (set by `--role poll` in `add-pane`) — verify before starting any implementer launch sequence. A bare shell prompt in the dashboard pane means the poller was never started.
 - never treat a shell-dropped pane as healthy
 - never trust callback examples copied from prompt text as real callbacks
 - never start the next milestone before the current one is accepted or explicitly reworked
 - never kill or rename a tmux window that is not tagged `@gaud-orchestrator=<current id>`; the conductor window has no such tag and must stay untouched
+
+## Runtime Agent Failure Recovery
+
+Agents can run out of credits mid-milestone. When a callback or health check indicates an agent is exhausted (quota depleted, rate-limited, or auth-expired):
+
+1. **Detect**: `gaud-poll` or pane health checks surface `GAUDMODE waiting-user ... summary=suspected-stuck:quota` or the implementer pane goes silent with exit/error.
+2. **Fallback**: Look up the configured `fallbacks` for the failed role. Pick the next ready/unknown agent from the fallback list.
+3. **Relaunch**: Kill the failed implementer pane. Relaunch with the fallback agent using the same milestone context, workstream, and conductor pane ID.
+4. **Notify**: Tag the callback with `workstream=<original>-retry:<fallback>` so the orchestrator can track which agent is now handling the work.
+5. **Continue**: The fallback picks up from the milestone brief — no need to restart the milestone unless the failed agent left the workspace in a broken state.
+
+When no fallback agent is configured for the role, or all fallbacks are exhausted too, report back to the user with what worked, what failed, and ask how to proceed.
 
 ## References
 

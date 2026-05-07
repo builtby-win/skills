@@ -93,8 +93,8 @@
     },
     {
       "id": 15,
-      "prompt": "Use gaud-mode for a substantial multi-role milestone. Prefer Codex for implementation and OpenCode for integration and review, but before launching, check whether the preferred providers still have usage available and fall back automatically if one is quota-blocked.",
-      "expected_output": "The agent performs a light provider-health preflight for the gaud-native roles it is about to launch, classifies providers as `ready`, `quota-blocked`, `rate-limited`, `auth-blocked`, or `unknown`, and falls back before dispatch when a preferred provider is clearly unavailable without stalling on `unknown` status.",
+      "prompt": "Use gaud-mode for a substantial multi-role milestone. Prefer Codex for implementation and OpenCode for integration and review, but before launching, check how much usage is left for the configured agents and ask me which ones to use if the remaining usage changes the obvious choice.",
+      "expected_output": "The agent runs the bundled gaud-agent-usage preflight after loading the merged gaud config, reports remaining percentage and reset timing for configured agents when available, classifies providers as `ready`, `quota-blocked`, `rate-limited`, `auth-blocked`, `unavailable`, or `unknown`, recommends agents that have enough remaining usage or reset soon, asks the user which agents to launch when the data makes the best map non-obvious, and avoids dispatching clearly blocked providers unless the user explicitly overrides.",
       "files": []
     },
     {

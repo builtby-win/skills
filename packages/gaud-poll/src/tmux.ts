@@ -82,7 +82,11 @@ export async function paneExists(
 }
 
 /**
- * Send a message to a tmux pane via tmux-cli send (includes Enter keystroke).
+ * Send a message to a tmux pane and press Enter afterwards.
+ *
+ * Both socket and non-socket paths use explicit `tmux send-keys` for the
+ * text AND a separate `tmux send-keys Enter` — no dependency on external
+ * tools like `tmux-cli` or its delayed-enter mechanism.
  */
 export async function sendToPane(
   paneId: string,
@@ -90,14 +94,67 @@ export async function sendToPane(
   options: TmuxOptions = {}
 ): Promise<boolean> {
   try {
-    if (options.socketName) {
-      await $`tmux -L ${options.socketName} send-keys -t ${paneId} -l -- ${message}`.quiet();
-      await $`tmux -L ${options.socketName} send-keys -t ${paneId} Enter`.quiet();
-    } else {
-      await $`tmux-cli send ${message} --pane=${paneId}`.quiet();
-    }
+    const prefix = options.socketName
+      ? ["-L", options.socketName!]
+      : [];
+
+    await $`tmux ${prefix} send-keys -t ${paneId} -l -- ${message}`.quiet();
+    await $`tmux ${prefix} send-keys -t ${paneId} Enter`.quiet();
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Send a message to a pane, then verify the pane content changed (i.e. Enter was
+ * processed). If the content hasn't changed after a short wait, resend Enter up
+ * to `maxRetries` times.
+ *
+ * This detects the common stuck-input case: text was typed into the orchestrator
+ * pane but Enter was swallowed or the pane was not in an accepting state.
+ *
+ * @returns true if the message was sent and the pane content changed within retries
+ */
+export async function sendToPaneWithVerify(
+  paneId: string,
+  message: string,
+  options: TmuxOptions & { maxRetries?: number; retryDelayMs?: number } = {}
+): Promise<boolean> {
+  const maxRetries = options.maxRetries ?? 3;
+  const retryDelayMs = options.retryDelayMs ?? 500;
+
+  // Capture pane content before we send anything
+  const before = await capturePane(paneId, options);
+  if (before === "") return false; // pane is dead
+
+  // Send the message
+  const sent = await sendToPane(paneId, message, options);
+  if (!sent) return false;
+
+  // Small delay to let the pane process the Enter
+  await new Promise((r) => setTimeout(r, 300));
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const after = await capturePane(paneId, options);
+    if (after !== before) return true; // content changed → Enter was processed
+
+    // Content unchanged — resend Enter
+    try {
+      const tmuxPrefix = options.socketName
+        ? `tmux -L ${options.socketName}`
+        : "tmux";
+      await $`${tmuxPrefix} send-keys -t ${paneId} Enter`.quiet();
+    } catch {
+      // ignore send errors on retry
+    }
+
+    if (attempt < maxRetries - 1) {
+      await new Promise((r) => setTimeout(r, retryDelayMs * (attempt + 1)));
+    }
+  }
+
+  // Last capture to confirm
+  const final = await capturePane(paneId, options);
+  return final !== before;
 }

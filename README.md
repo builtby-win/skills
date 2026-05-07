@@ -96,6 +96,15 @@ Recommended defaults:
 If a preferred CLI is missing, `gaud-mode` should report the fallback it is using
 instead of silently swapping providers.
 
+Before launching panes, `gaud-mode` should run `skills/gaud-mode/bin/gaud-agent-usage`
+to summarize remaining usage for the configured agents. The helper reads the merged
+gaud config plus fresh Back2Vibing-style `usage-cache.json` snapshots, reports
+remaining percentages and reset timing, evaluates configured fallbacks, ranks
+agents that are healthy or reset soon while conserving low-remaining agents, and
+asks the user which agents to use when the usage data makes the best map
+non-obvious. Clearly depleted, rate-limited, auth-blocked, or unavailable agents
+should not be launched silently when a healthier configured fallback exists.
+
 Example fallback message:
 - `Codex not found, so using OpenCode for implementation while keeping OpenCode as the Integrator for review.`
 - `Gemini not found, so using Claude for UI design and critique.`
