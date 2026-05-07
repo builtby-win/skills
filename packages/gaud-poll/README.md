@@ -19,20 +19,25 @@ bun run build
 
 This compiles a self-contained binary at `bin/gaud-poll` — no runtime needed to run it after compilation.
 
-## Watch-mode status line
+## Watch-mode dashboard
 
-In `watch` mode, `gaud-poll` renders a live single-line status indicator on
-stderr so the user can see that the poller is alive between polls:
+In `watch` mode, `gaud-poll` renders a live dashboard on stderr so the user can
+see the other side of a gaud run while implementers work in a gaud-managed tmux
+server:
 
 ```
-⠋ next poll in 27s · watching 2 panes
-⠙ polling… (0.4s) · 2 panes
+ GAUD — auth-refactor uptime 14:32
+ private tmux: gaud-auth-refactor · next poll 00:27
+ ────────────────────────────────────────────────────────────────────────
+ impl:frontend    ⠋ working  current    02:34 codex
+ impl:backend     ✓ done     current    01:12 token-store: finished
+ impl:db-mig      ! stuck    current    00:45 shell-dropped: Expected codex...
+ ────────────────────────────────────────────────────────────────────────
+ last event: 14:32:00 impl:backend → done: finished token store
 ```
 
-The status line auto-disables when stderr is not a TTY (e.g. redirected to a
-file or piped), so JSONL and log redirection stay clean. Event output is
-routed through the status line so callbacks, stuck notifications, and
-pane-dead messages never get stomped by the spinner.
+The dashboard auto-disables when stderr is not a TTY (e.g. redirected to a file
+or piped), so JSONL and log redirection stay clean.
 
 ## Usage
 
@@ -57,6 +62,25 @@ gaud-poll watch \
   -p %12:Integrator:opencode \
   -i 20
 ```
+
+### Watch a gaud-managed private tmux server
+
+Keep the conductor and dashboard in the user's tmux session, but poll
+implementer panes from an isolated tmux server owned by gaud:
+
+```bash
+tmux -L gaud-auth-refactor new-session -d -s auth-refactor
+
+gaud-poll watch \
+  --title auth-refactor \
+  --tmux-socket gaud-auth-refactor \
+  -c %0 \
+  -p %1:impl:codex
+```
+
+`--tmux-socket` only affects watched implementer panes. Conductor forwarding
+still targets the current tmux session so `tmux-cli send` can deliver callbacks
+to the orchestrator pane.
 
 ### Quick scan — find callbacks across all tmux panes
 

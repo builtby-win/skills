@@ -1,5 +1,10 @@
 import { $ } from "bun";
 
+export interface TmuxOptions {
+  /** Optional tmux socket name for gaud-managed private tmux servers. */
+  socketName?: string | null;
+}
+
 export interface PaneInfo {
   id: string;
   sessionName: string;
@@ -12,11 +17,13 @@ export interface PaneInfo {
 /**
  * List all tmux panes across all sessions.
  */
-export async function listPanes(): Promise<PaneInfo[]> {
+export async function listPanes(options: TmuxOptions = {}): Promise<PaneInfo[]> {
   try {
     const sep = "%%SEP%%";
     const fmt = `#{pane_id}${sep}#{session_name}${sep}#{window_index}${sep}#{window_name}${sep}#{pane_current_command}${sep}#{pane_active}`;
-    const result = await $`tmux list-panes -a -F ${fmt}`.text();
+    const result = options.socketName
+      ? await $`tmux -L ${options.socketName} list-panes -a -F ${fmt}`.text()
+      : await $`tmux list-panes -a -F ${fmt}`.text();
     return result
       .trim()
       .split("\n")
@@ -41,9 +48,14 @@ export async function listPanes(): Promise<PaneInfo[]> {
 /**
  * Capture the visible content of a tmux pane.
  */
-export async function capturePane(paneId: string): Promise<string> {
+export async function capturePane(
+  paneId: string,
+  options: TmuxOptions = {}
+): Promise<string> {
   try {
-    return await $`tmux capture-pane -t ${paneId} -p -J -S -200`.text();
+    return options.socketName
+      ? await $`tmux -L ${options.socketName} capture-pane -t ${paneId} -p -J -S -200`.text()
+      : await $`tmux capture-pane -t ${paneId} -p -J -S -200`.text();
   } catch {
     return "";
   }
@@ -52,9 +64,14 @@ export async function capturePane(paneId: string): Promise<string> {
 /**
  * Check if a pane still exists.
  */
-export async function paneExists(paneId: string): Promise<boolean> {
+export async function paneExists(
+  paneId: string,
+  options: TmuxOptions = {}
+): Promise<boolean> {
   try {
-    const target = await $`tmux display-message -p -t ${paneId} '#{pane_id}'`.text();
+    const target = options.socketName
+      ? await $`tmux -L ${options.socketName} display-message -p -t ${paneId} '#{pane_id}'`.text()
+      : await $`tmux display-message -p -t ${paneId} '#{pane_id}'`.text();
     if (!target.trim()) {
       return false;
     }
@@ -69,10 +86,16 @@ export async function paneExists(paneId: string): Promise<boolean> {
  */
 export async function sendToPane(
   paneId: string,
-  message: string
+  message: string,
+  options: TmuxOptions = {}
 ): Promise<boolean> {
   try {
-    await $`tmux-cli send ${message} --pane=${paneId}`.quiet();
+    if (options.socketName) {
+      await $`tmux -L ${options.socketName} send-keys -t ${paneId} -l -- ${message}`.quiet();
+      await $`tmux -L ${options.socketName} send-keys -t ${paneId} Enter`.quiet();
+    } else {
+      await $`tmux-cli send ${message} --pane=${paneId}`.quiet();
+    }
     return true;
   } catch {
     return false;

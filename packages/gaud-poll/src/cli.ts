@@ -4,7 +4,7 @@ import { GaudPoller, type PollEvent } from "./poller";
 import { listPanes } from "./tmux";
 import type { WatchedPane } from "./poller";
 import { parsePaneArg } from "./pane-args";
-import { StatusLine } from "./status-line";
+import { AgentDashboard } from "./agent-dashboard";
 import { getBuildInfo } from "./version";
 
 type Logger = (message: string) => void;
@@ -18,6 +18,8 @@ const { values, positionals } = parseArgs({
     output: { type: "string", short: "o" },
     pane: { type: "string", multiple: true, short: "p" },
     conductor: { type: "string", short: "c" },
+    "tmux-socket": { type: "string" },
+    title: { type: "string" },
     "poll-once": { type: "boolean" },
     watch: { type: "boolean", short: "w" },
     scan: { type: "boolean", short: "s" },
@@ -57,7 +59,8 @@ switch (command) {
 
 async function runScan() {
   // Scan all tmux panes for any GAUDMODE/GODMODE callbacks right now
-  const panes = await listPanes();
+  const tmuxSocketName = (values["tmux-socket"] as string | undefined) ?? null;
+  const panes = await listPanes({ socketName: tmuxSocketName });
   if (panes.length === 0) {
     console.error("No tmux panes found.");
     process.exit(1);
@@ -65,6 +68,7 @@ async function runScan() {
 
   const log: Logger = (msg) => console.error(msg);
   const poller = new GaudPoller({
+    tmuxSocketName,
     onEvents: (events) => printEventsHuman(events, log),
     // No outputFile — skip JSONL for scan mode
   });
@@ -94,6 +98,8 @@ async function runWatch() {
   const interval = parseInt(values.interval as string, 10) || 30;
   const outputFile = (values.output as string) ?? null;
   const conductorPane = (values.conductor as string) ?? null;
+  const tmuxSocketName = (values["tmux-socket"] as string | undefined) ?? null;
+  const title = (values.title as string | undefined) ?? tmuxSocketName ?? "gaud";
 
   if (!conductorPane) {
     console.error(
@@ -101,16 +107,20 @@ async function runWatch() {
     );
   }
 
-  const statusLine = new StatusLine();
-  const log: Logger = (msg) => statusLine.log(msg);
+  const dashboard = new AgentDashboard(panes, { title, tmuxSocketName });
+  const log: Logger = (msg) => dashboard.log(msg);
 
   const poller = new GaudPoller({
     interval,
     outputFile,
     conductorPane,
-    onEvents: (events) => printEventsHuman(events, log),
-    onPollStart: () => statusLine.setPolling(panes.length),
-    onPollEnd: (nextPollAt) => statusLine.setIdle(nextPollAt, panes.length),
+    tmuxSocketName,
+    onEvents: (events) => {
+      dashboard.applyEvents(events);
+      printEventsHuman(events, log);
+    },
+    onPollStart: () => dashboard.setPolling(),
+    onPollEnd: (nextPollAt) => dashboard.setIdle(nextPollAt),
   });
 
   for (const pane of panes) {
@@ -123,6 +133,9 @@ async function runWatch() {
   for (const p of panes) {
     console.error(`  ${p.paneId} → ${p.role} (${p.expectedCommand})`);
   }
+  if (tmuxSocketName) {
+    console.error(`  private tmux → ${tmuxSocketName}`);
+  }
   if (outputFile) {
     console.error(`  output → ${outputFile}`);
   }
@@ -131,11 +144,11 @@ async function runWatch() {
   }
   console.error("");
 
-  statusLine.start();
+  dashboard.start();
   poller.start();
 
   const shutdown = (code: number, farewell?: string) => {
-    statusLine.stop();
+    dashboard.stop();
     if (farewell) process.stderr.write(farewell + "\n");
     poller.stop();
     process.exit(code);
@@ -154,8 +167,10 @@ async function runPollOnce() {
   }
 
   const log: Logger = (msg) => console.error(msg);
+  const tmuxSocketName = (values["tmux-socket"] as string | undefined) ?? null;
   const poller = new GaudPoller({
     conductorPane: (values.conductor as string) ?? null,
+    tmuxSocketName,
     onEvents: (events) => printEventsHuman(events, log),
   });
 
@@ -210,6 +225,10 @@ OPTIONS:
                               Required for watch mode.
   -p, --pane <id:role:cmd>    Pane to watch (repeatable)
                               Format: %1:Implementer:codex
+      --tmux-socket <name>    Poll watched panes from a gaud-managed private
+                              tmux server, e.g. gaud-my-plan. Conductor
+                              forwarding still targets the current tmux session.
+      --title <name>          Dashboard title (default: socket name or gaud)
   -i, --interval <seconds>    Polling interval (default: 30)
   -o, --output <file>         Write events as JSONL to file (default: stdout)
   -s, --scan                  Scan all panes (alias for scan command)

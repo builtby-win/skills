@@ -1,4 +1,4 @@
-import { capturePane, paneExists, listPanes, sendToPane } from "./tmux";
+import { capturePane, paneExists, listPanes, sendToPane, type TmuxOptions } from "./tmux";
 import {
   parseCallbacks,
   detectStuck,
@@ -30,13 +30,14 @@ export interface PollEvent {
  */
 export async function pollPane(
   pane: WatchedPane,
-  seenCallbacks: Set<string>
+  seenCallbacks: Set<string>,
+  tmuxOptions: TmuxOptions = {}
 ): Promise<PollEvent[]> {
   const events: PollEvent[] = [];
   const now = new Date().toISOString();
 
   // Check if pane still exists
-  const alive = await paneExists(pane.paneId);
+  const alive = await paneExists(pane.paneId, tmuxOptions);
   if (!alive) {
     events.push({
       timestamp: now,
@@ -54,7 +55,7 @@ export async function pollPane(
     pane.expectedCommand !== "unknown" &&
     !shells.has(pane.expectedCommand)
   ) {
-    const allPanes = await listPanes();
+    const allPanes = await listPanes(tmuxOptions);
     const current = allPanes.find((p) => p.id === pane.paneId);
     if (current && shells.has(current.command)) {
       events.push({
@@ -74,7 +75,7 @@ export async function pollPane(
   }
 
   // Capture pane content
-  const output = await capturePane(pane.paneId);
+  const output = await capturePane(pane.paneId, tmuxOptions);
   if (!output) return events;
 
   // Parse for new callbacks
@@ -115,6 +116,8 @@ export interface PollerOptions {
   outputFile: string | null;
   /** Conductor/orchestrator pane ID to forward events to */
   conductorPane: string | null;
+  /** Optional tmux socket name for watched implementer panes. */
+  tmuxSocketName: string | null;
   /** Callback for each batch of events */
   onEvents?: (events: PollEvent[]) => void;
   /** Fired right before each pollOnce() cycle begins */
@@ -158,7 +161,10 @@ export class GaudPoller {
       interval: options.interval ?? 30,
       outputFile: options.outputFile ?? null,
       conductorPane: options.conductorPane ?? null,
+      tmuxSocketName: options.tmuxSocketName ?? null,
       onEvents: options.onEvents,
+      onPollStart: options.onPollStart,
+      onPollEnd: options.onPollEnd,
     };
   }
 
@@ -179,7 +185,9 @@ export class GaudPoller {
 
     try {
       for (const pane of this.panes.values()) {
-        const events = await pollPane(pane, this.seenCallbacks);
+        const events = await pollPane(pane, this.seenCallbacks, {
+          socketName: this.options.tmuxSocketName,
+        });
         allEvents.push(...events);
       }
 
