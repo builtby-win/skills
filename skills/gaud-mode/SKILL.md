@@ -105,10 +105,41 @@ Minimum contract:
 - `implementers`: which agents gaud may launch as implementers
 - gaud must reflect the chosen orchestrator and implementers back to the user before launch
 
+## Usage-Aware Agent Selection
+
+Before launch, gaud must run the bundled usage preflight after config loading and before choosing panes:
+
+```bash
+"$_GAUD_DIR/bin/gaud-agent-usage" --repo "${GAUD_REPO_ROOT:-$PWD}"
+```
+
+Use `--json` when you need machine-readable ranking for a scriptable decision.
+
+The helper:
+- loads the last valid JSON object from `~/.config/gaud.config.jsonl` and `.gaud.config.jsonl`, with repo override on top of global config
+- reads Back2Vibing-style usage snapshots from explicit `GAUD_USAGE_CACHE` / `B2V_USAGE_CACHE` paths, or otherwise from repo `usage-cache.json` and common Back2Vibing cache paths
+- ignores stale Back2Vibing snapshots older than 30 minutes and reports them as stale instead of treating them as current
+- understands the Back2Vibing shape: `UsageState.providers[].quotas[].percent_remaining`, `resets_at_ms`, `reset_text`, `error`, and `auth_type`
+- evaluates configured fallback agents as candidate launch choices, not just the preferred role map
+- classifies each configured agent as `ready`, `quota-blocked`, `rate-limited`, `auth-blocked`, `unavailable`, or `unknown`
+- ranks ready agents that reset soon and still have enough quota as good candidates so gaud can spend expiring quota intentionally, while conserving agents below 20%
+
+Decision rules:
+- Present the usage summary and suggested order before launching panes.
+- Ask the user which agents to use for this run when the usage data changes the obvious choice, when a preferred agent is depleted, or when multiple ready agents are close.
+- Default to the suggested ready agents if the user already gave a clear role map and no configured agent is blocked.
+- Do not stall on `unknown`; keep unknown agents available but lower-confidence, and pair them with a ready fallback when possible.
+- Do not launch `quota-blocked`, `rate-limited`, `auth-blocked`, or `unavailable` agents unless the user explicitly chooses them after seeing the summary.
+- Prefer agents with enough remaining quota and a near reset when the work fits; conserve agents below 20% unless they reset very soon or the user chooses them.
+
+Back2Vibing has the richest known usage probes today for Claude, Codex, Gemini, and Antigravity. OpenCode currently has no Back2Vibing quota probe, so treat it as `unknown` unless another usage source is supplied.
+
 ## Setup And Launch
 
 Before launch:
 - verify `tmux` and `tmux-cli`
+- load global/repo gaud config, then run `"$_GAUD_DIR/bin/gaud-agent-usage" --repo "${GAUD_REPO_ROOT:-$PWD}"`
+- show the usage summary, including remaining percentage and reset timing, and ask the user for agent choices when the preflight makes the best map non-obvious
 - verify the chosen orchestrator CLI and implementer CLIs exist
 - reconcile `gaud-poll` with `"$_GAUD_DIR/bin/gaud-poll-install"` so the preferred poller path rebuilds only when the binary is missing, stale, corrupt, or explicitly forced
 - record the conductor pane with `tmux display-message -p '#{pane_id}'`
@@ -127,9 +158,10 @@ Use `skills/gaud-mode/references/markdown-plan-template.md` as the source of tru
 ## Callback Transport
 
 Preferred path:
-- run `gaud-poll watch ...` in a background pane
+- run `gaud-poll watch ...` in a visible dashboard pane in the user's tmux session
 - `gaud-poll --version` and the adjacent `gaud-poll.build.json` metadata should be usable for preflight visibility and rebuild checks
 - gaud-poll watches implementer panes and forwards events to the conductor pane
+- when using gaud's private tmux server, launch `gaud-poll` in the user's tmux session with `--tmux-socket gaud-<plan>` so callback forwarding still uses the user's conductor pane while implementer capture uses the private server
 
 Fallback path when `gaud-poll` is unavailable or broken:
 - implementers send callbacks directly to the conductor pane with `tmux-cli send`
@@ -166,7 +198,10 @@ Use the bundled helper so the user never loses track of the run:
 
 Layout contract:
 - The conductor stays in whatever window the user already has open. Gaud never renames or moves that window.
-- Gaud adds at most two new windows, inserted immediately to the right of the conductor:
+- For tmux-first runs, gaud opens one visible dashboard window in the user's tmux session. This window runs `gaud-poll watch` and shows per-agent status (`starting`, `working`, `done`, `waiting`, `stuck`, `dead`) with spinners.
+- Implementers should run in gaud's private tmux server whenever possible: `tmux -L gaud-<plan> new-session -d -s <plan>`.
+- `gaud-poll` stays in the user's tmux session and polls implementers with `--tmux-socket gaud-<plan>`, then forwards callbacks to the conductor pane with the normal current-session `tmux-cli send` path.
+- If private tmux is unavailable, gaud may fall back to the old same-session layout:
   - `gaud` — holds `gaud-poll` plus any observer panes (UX/UI, Integrator, TPM, Investigator) as splits
   - `impl` — holds 1-2 implementer panes, tiled; grow past 2 only when the plan clearly needs it
 - Each new window is tagged with `@gaud-orchestrator=<id>` and `@gaud-window={gaud|impl}`. Cleanup reads those tags, never window names.
@@ -179,15 +214,17 @@ Typical call sequence:
 # Once per orchestrator run
 "$_GAUD_DIR/bin/gaud-tmux-layout" init --orchestrator <id>
 
-# gaud-poll lives in the gaud window
+# Private implementer server named after the plan being executed
+tmux -L gaud-<plan> new-session -d -s <plan>
+
+# gaud-poll lives in the user's tmux session dashboard window
 "$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --orchestrator <id> --window gaud \
   --role poll --workstream <id> --milestone '*' \
-  --command 'gaud-poll watch -c <conductor> -p <pane>:<role>:<cmd>'
+  --command 'gaud-poll watch --title <plan> --tmux-socket gaud-<plan> -c <conductor> -p <pane>:<role>:<cmd>'
 
-# Implementers live in the impl window (first call replaces the placeholder shell)
-"$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --orchestrator <id> --window impl \
-  --role impl --workstream frontend --milestone M1 \
-  --command 'B2V_DISABLED=true codex --yolo -m <model> "<kickoff prompt>"'
+# Implementers live in gaud's private tmux server
+tmux -L gaud-<plan> new-window -t <plan> -n impl-frontend \
+  'B2V_DISABLED=true codex --yolo -m <model> "<kickoff prompt>"'
 
 # After a milestone is accepted
 "$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone M1 --role impl
@@ -197,6 +234,8 @@ Typical call sequence:
 ```
 
 The helper refuses to touch a window that is not tagged with the current orchestrator id and will not kill the conductor window even by accident.
+
+Non-tmux conductor support is intentionally a later backend. Keep the poller/conductor transport abstract enough that `tmux-cli send` can be replaced by a stdin pipe or FIFO without changing the implementer polling loop.
 
 ## Milestone Loop
 
@@ -211,16 +250,17 @@ When the orchestrator sees `summary=suspected-stuck: ...`, it should inspect the
 Keep only one active milestone at a time.
 
 After an accepted milestone:
-- retire the implementer panes used for that milestone via
-  `"$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone <m> --role impl`
+- retire the implementer panes used for that milestone. In private-tmux mode, target the private server directly, for example `tmux -L gaud-<plan> kill-window -t <plan>:impl-<workstream>` or kill the specific private pane/window launched for that milestone. In same-session fallback mode, use `"$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone <m> --role impl`.
 - relaunch fresh implementers for the next milestone
-- at the end of the program, run `"$_GAUD_DIR/bin/gaud-tmux-layout" end --orchestrator <id>` to close the `gaud` and `impl` windows without touching the conductor window
+- at the end of the program, stop the private tmux server with `tmux -L gaud-<plan> kill-session -t <plan>` and run `"$_GAUD_DIR/bin/gaud-tmux-layout" end --orchestrator <id>` to close the visible dashboard window without touching the conductor window. In same-session fallback mode, `end` closes the `gaud` and `impl` windows.
 
 ## Guardrails
 
 - never skip the update check
 - never let implementers guess who the orchestrator is
 - never launch implementers without the real conductor pane ID
+- never skip the usage-aware agent preflight before launching panes
+- never silently launch a clearly depleted, auth-blocked, rate-limited, or unavailable agent when a healthier configured fallback exists
 - never treat a shell-dropped pane as healthy
 - never trust callback examples copied from prompt text as real callbacks
 - never start the next milestone before the current one is accepted or explicitly reworked

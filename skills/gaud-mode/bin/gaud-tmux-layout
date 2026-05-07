@@ -303,7 +303,10 @@ USAGE
   gaud-tmux-layout end        --orchestrator <id>
 
 LAYOUT
-  conductor window (untouched)  →  "gaud" window  →  "impl" window
+  conductor window (untouched)  →  visible "gaud" dashboard window
+  implementers usually run in a gaud-owned private tmux server:
+    tmux -L gaud-<plan> new-session -d -s <plan>
+  Same-session "impl" windows are retained as a fallback.
   Pane titles use the form:  <role>:<workstream>:<milestone>
   Examples:                  poll:dark-mode:*    impl:frontend:M1
 
@@ -318,13 +321,14 @@ EXAMPLES
 
   gaud-tmux-layout add-pane --orchestrator dark-mode --window gaud \
     --role poll --workstream dark-mode --milestone '*' \
-    --command 'gaud-poll watch -c %0 -p %5:Implementer:codex'
+    --command 'gaud-poll watch --title dark-mode --tmux-socket gaud-dark-mode -c %0 -p %5:Implementer:codex'
 
-  gaud-tmux-layout add-pane --orchestrator dark-mode --window impl \
-    --role impl --workstream frontend --milestone M1 \
-    --command 'B2V_DISABLED=true codex --yolo -m gpt-5.4-mini "..."'
+  tmux -L gaud-dark-mode new-session -d -s dark-mode
+  tmux -L gaud-dark-mode new-window -t dark-mode -n impl-frontend \
+    'B2V_DISABLED=true codex --yolo -m gpt-5.4-mini "..."'
 
-  gaud-tmux-layout retire --orchestrator dark-mode --milestone M1 --role impl
+  tmux -L gaud-dark-mode kill-window -t dark-mode:impl-frontend
+  tmux -L gaud-dark-mode kill-session -t dark-mode
   gaud-tmux-layout end    --orchestrator dark-mode
 EOF
 }
