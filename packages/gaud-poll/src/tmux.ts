@@ -81,6 +81,22 @@ export async function paneExists(
   }
 }
 
+export async function killPane(
+  paneId: string,
+  options: TmuxOptions = {}
+): Promise<boolean> {
+  try {
+    const prefix = options.socketName
+      ? ["-L", options.socketName!]
+      : [];
+
+    await $`tmux ${prefix} kill-pane -t ${paneId}`.quiet();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Send a message to a tmux pane and press Enter afterwards.
  *

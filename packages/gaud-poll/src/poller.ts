@@ -1,4 +1,4 @@
-import { capturePane, paneExists, listPanes, sendToPane, sendToPaneWithVerify, type TmuxOptions } from "./tmux";
+import { capturePane, paneExists, listPanes, killPane, sendToPaneWithVerify, type TmuxOptions } from "./tmux";
 import {
   parseCallbacks,
   detectStuck,
@@ -150,6 +150,16 @@ export function formatEventForConductor(event: PollEvent): string | null {
   }
 }
 
+export function completedPaneIds(events: PollEvent[]): string[] {
+  const paneIds = new Set<string>();
+  for (const event of events) {
+    if (event.event.kind === "callback" && event.event.callback.type === "done") {
+      paneIds.add(event.paneId);
+    }
+  }
+  return [...paneIds];
+}
+
 export class GaudPoller {
   private panes: Map<string, WatchedPane> = new Map();
   private seenCallbacks: Set<string> = new Set();
@@ -195,6 +205,7 @@ export class GaudPoller {
         this.options.onEvents?.(allEvents);
         await this.writeEvents(allEvents);
         await this.forwardToConductor(allEvents);
+        await this.retireCompletedPanes(allEvents);
       }
     } finally {
       this.options.onPollEnd?.(Date.now() + this.options.interval * 1000);
@@ -246,6 +257,20 @@ export class GaudPoller {
       if (!verified) {
         console.error(
           `gaud-poll: forwarded event to conductor ${conductorPane} but pane content did not change (Enter may not have been processed)`
+        );
+      }
+    }
+  }
+
+  private async retireCompletedPanes(events: PollEvent[]): Promise<void> {
+    for (const paneId of completedPaneIds(events)) {
+      const killed = await killPane(paneId, {
+        socketName: this.options.tmuxSocketName,
+      });
+      this.unwatch(paneId);
+      if (!killed) {
+        console.error(
+          `gaud-poll: done pane ${paneId} was unwatched but could not be killed`
         );
       }
     }

@@ -222,7 +222,7 @@ USAGE:
 
 OPTIONS:
   -c, --conductor <pane_id>   Conductor/orchestrator pane ID. Events are forwarded
-                              to this pane as GAUDMODE messages via tmux-cli send.
+                              to this pane as GAUDMODE messages via tmux send-keys.
                               Required for watch mode.
   -p, --pane <id:role:cmd>    Pane to watch (repeatable)
                               Format: %1:Implementer:codex
