@@ -21,6 +21,13 @@ interface AgentRow {
   updatedAt: number;
 }
 
+interface TimelineEntry {
+  timestamp: string;
+  role: string;
+  status: string;
+  detail: string;
+}
+
 export interface AgentDashboardOptions {
   title?: string;
   tmuxSocketName?: string | null;
@@ -41,6 +48,7 @@ export class AgentDashboard {
   private timer: ReturnType<typeof setInterval> | null = null;
   private renderedLines = 0;
   private lastEvent = "waiting for first poll";
+  private timeline: TimelineEntry[] = [];
 
   constructor(panes: WatchedPane[], options: AgentDashboardOptions = {}) {
     this.enabled = Boolean(process.stderr.isTTY);
@@ -127,6 +135,7 @@ export class AgentDashboard {
           agent.status = callback.type === "done" ? "done" : "waiting";
           agent.detail = `${callback.workstream}: ${callback.summary}`;
           this.lastEvent = `${timeOf(event.timestamp)} ${agent.role} → ${callback.type}: ${callback.summary}`;
+          this.addTimeline(event.timestamp, agent.role, callback.type, `${callback.workstream}: ${callback.summary}`);
           this.writeLog(`event callback role=${agent.role} pane=${event.paneId} type=${callback.type} summary=${callback.summary}`);
           break;
         }
@@ -134,12 +143,14 @@ export class AgentDashboard {
           agent.status = "stuck";
           agent.detail = `${event.event.indicator.type}: ${event.event.indicator.detail}`;
           this.lastEvent = `${timeOf(event.timestamp)} ${agent.role} → stuck: ${event.event.indicator.type}`;
+          this.addTimeline(event.timestamp, agent.role, "stuck", agent.detail);
           this.writeLog(`event stuck role=${agent.role} pane=${event.paneId} type=${event.event.indicator.type} detail=${event.event.indicator.detail}`);
           break;
         case "pane-dead":
           agent.status = "dead";
           agent.detail = "pane no longer exists";
           this.lastEvent = `${timeOf(event.timestamp)} ${agent.role} → dead`;
+          this.addTimeline(event.timestamp, agent.role, "dead", agent.detail);
           this.writeLog(`event pane-dead role=${agent.role} pane=${event.paneId}`);
           break;
       }
@@ -177,6 +188,11 @@ export class AgentDashboard {
     return agent;
   }
 
+  private addTimeline(timestamp: string, role: string, status: string, detail: string): void {
+    this.timeline.push({ timestamp, role, status, detail });
+    if (this.timeline.length > 8) this.timeline.shift();
+  }
+
   private render(): void {
     if (!this.enabled) return;
 
@@ -208,6 +224,8 @@ export class AgentDashboard {
   }
 
   private buildLines(): string[] {
+    const width = terminalWidth();
+    const rule = muted("─".repeat(width - 2));
     const header = ` GAUD — ${this.title} ${muted(`uptime ${formatDuration(Date.now() - this.startedAt)}`)}`;
     const source = this.tmuxSocketName ? `private tmux: ${this.tmuxSocketName}` : "current tmux";
     const phase = this.phase === "polling"
@@ -216,27 +234,43 @@ export class AgentDashboard {
 
     const rows = [...this.agents.values()]
       .sort((a, b) => a.role.localeCompare(b.role) || a.paneId.localeCompare(b.paneId))
-      .map((agent) => this.renderAgent(agent));
+      .flatMap((agent) => this.renderAgent(agent, width));
+
+    const timeline = this.timeline.slice(-4).map((entry) => this.renderTimeline(entry, width));
 
     return [
       header,
       ` ${muted(source)} ${muted("·")} ${muted(phase)}`,
-      ` ${muted("─".repeat(72))}`,
+      ` ${rule}`,
       ...rows,
-      ` ${muted("─".repeat(72))}`,
-      ` ${muted("last event:")} ${truncate(this.lastEvent, 58)}`,
+      ` ${rule}`,
+      ` ${muted("timeline")}`,
+      ...(timeline.length > 0 ? timeline : [` ${muted("  waiting for first poll")}`]),
+      ` ${rule}`,
+      ` ${muted("last:")} ${truncate(this.lastEvent, width - 8)}`,
     ];
   }
 
-  private renderAgent(agent: AgentRow): string {
+  private renderAgent(agent: AgentRow, width: number): string[] {
     const marker = statusMarker(agent.status, this.frame);
-    const role = pad(truncate(agent.role, 16), 16);
+    const role = pad(truncate(agent.role, 20), 20);
     const status = pad(agent.status, 8);
-    const milestone = pad(truncate(agent.milestone, 10), 10);
-    const elapsed = pad(formatDuration(Date.now() - agent.startedAt), 6);
-    const detail = truncate(agent.detail, 28);
+    const milestone = pad(truncate(agent.milestone, 12), 12);
+    const elapsed = pad(formatDuration(Date.now() - agent.startedAt), 7);
+    const updated = timeOf(new Date(agent.updatedAt).toISOString());
+    const prefix = ` ${role} ${marker} ${status} ${milestone} ${elapsed} ${updated} `;
+    const detailWidth = Math.max(24, width - visibleLength(prefix) - 1);
+    const detailLines = wrap(agent.detail, detailWidth, 3);
 
-    return ` ${role} ${marker} ${status} ${milestone} ${elapsed} ${muted(detail)}`;
+    return detailLines.map((line, index) => {
+      if (index === 0) return `${prefix}${muted(line)}`;
+      return `${" ".repeat(visibleLength(prefix))}${muted(line)}`;
+    });
+  }
+
+  private renderTimeline(entry: TimelineEntry, width: number): string {
+    const prefix = `  ${timeOf(entry.timestamp)} ${truncate(entry.role, 18)} ${entry.status}: `;
+    return ` ${muted(truncate(prefix + entry.detail, width - 2))}`;
   }
 }
 
@@ -264,6 +298,40 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function terminalWidth(): number {
+  return Math.max(80, Math.min(process.stderr.columns ?? 100, 160));
+}
+
+function visibleLength(text: string): number {
+  return text.replace(/\x1b\[[0-9;]*m/g, "").length;
+}
+
+function wrap(text: string, width: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+
+  for (const word of words) {
+    if (!line) {
+      line = word;
+    } else if (`${line} ${word}`.length <= width) {
+      line = `${line} ${word}`;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+
+    if (lines.length === maxLines) break;
+  }
+
+  if (line && lines.length < maxLines) lines.push(line);
+  if (lines.length === 0) lines.push("");
+  if (words.join(" ").length > lines.join(" ").length) {
+    lines[lines.length - 1] = truncate(lines[lines.length - 1], Math.max(1, width - 1)) + "…";
+  }
+  return lines;
 }
 
 function truncate(text: string, width: number): string {
