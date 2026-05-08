@@ -209,7 +209,11 @@ export class AgentDashboard {
       if (i < lineCount - 1) process.stderr.write("\n");
     }
 
-    this.renderedLines = lines.length;
+    // Clear anything from cursor to end of screen — ensures no residual
+    // lines from a previous larger render or unexpected stderr output.
+    process.stderr.write("\x1b[J");
+
+    this.renderedLines = lineCount;
     this.frame = (this.frame + 1) % FRAMES.length;
   }
 
@@ -220,6 +224,7 @@ export class AgentDashboard {
       process.stderr.write(CLEAR_LINE);
       if (i < this.renderedLines - 1) process.stderr.write("\n");
     }
+    process.stderr.write("\x1b[J");
     this.renderedLines = 0;
   }
 
