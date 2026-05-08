@@ -166,8 +166,13 @@ cmd_add_pane() {
     tmux respawn-pane -k -t "$pane" "$command" >/dev/null
     tmux set-option -w -t "$win" @gaud-placeholder 0 >/dev/null
   else
-    pane=$(tmux split-window -d -t "$win" -P -F '#{pane_id}' "$command")
-    tmux select-layout -t "$win" tiled >/dev/null
+    if [ "$kind" = gaud ]; then
+      pane=$(tmux split-window -h -d -t "$win" -P -F '#{pane_id}' "$command")
+      tmux select-layout -t "$win" even-horizontal >/dev/null
+    else
+      pane=$(tmux split-window -d -t "$win" -P -F '#{pane_id}' "$command")
+      tmux select-layout -t "$win" tiled >/dev/null
+    fi
   fi
 
   tmux select-pane -t "$pane" -T "$title" >/dev/null

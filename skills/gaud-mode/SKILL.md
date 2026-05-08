@@ -203,7 +203,7 @@ Use the bundled helper so the user never loses track of the run:
 
 Layout contract:
 - The conductor stays in whatever window the user already has open. Gaud never renames or moves that window.
-- For tmux-first runs, gaud splits the conductor window and runs `gaud-poll watch` in the neighboring pane so the user sees orchestrator + dashboard together.
+- For tmux-first runs, gaud splits the conductor window left/right and runs `gaud-poll watch` in the neighboring pane so the user sees orchestrator + dashboard together.
 - The dashboard shows per-agent status (`starting`, `working`, `done`, `waiting`, `stuck`, `dead`), elapsed time, last update time, wrapped details, and a short event timeline.
 - Implementers should run in gaud's private tmux server whenever possible: `tmux -L gaud-<plan> new-session -d -s <plan>`.
 - `gaud-poll` stays in the user's tmux session and polls implementers with `--tmux-socket gaud-<plan>`, then forwards callbacks to the conductor pane with direct current-session `tmux send-keys` plus Enter verification.
@@ -221,7 +221,7 @@ Mandatory call sequence (every bullet must execute, in order):
 # 2. Record the conductor pane ID BEFORE anything else uses it
 CONDUCTOR_PANE=$(tmux display-message -p '#{pane_id}')
 
-# 3. Start gaud-poll as a split next to the orchestrator pane
+# 3. Start gaud-poll as a left/right split next to the orchestrator pane
 "$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --orchestrator <id> --window gaud \
   --role poll --workstream <id> --milestone '*' \
   --command 'gaud-poll watch --title <plan> --tmux-socket gaud-<plan> -c <conductor> -p <pane>:<role>:<cmd>'
