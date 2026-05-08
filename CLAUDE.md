@@ -79,13 +79,15 @@ so the local skill checkout can update before the binary reconcile step rebuilds
 from current local sources.
 
 tmux layout is owned by `skills/gaud-mode/bin/gaud-tmux-layout`, a bundled bash
-helper with no extra install step. It enforces a fixed two-window layout:
+helper with no extra install step. It keeps the dashboard beside the
+orchestrator in the launch window:
 
 - the `CEO/PM` conductor stays in whatever tmux window the user is already in
-  and is never touched
-- a `gaud` window immediately to the right holds `gaud-poll` plus any UX,
-  Integrator, TPM, or Investigator panes as splits
-- an `impl` window next to that holds 1-2 `Implementer` panes, tiled
+  and gets tagged as the `gaud` window
+- `gaud-poll` runs as a split pane next to the conductor so the user can see
+  the orchestrator and dashboard together
+- private tmux remains the preferred implementer home; the `impl` window to the
+  right is only a same-session fallback for 1-2 `Implementer` panes
 - each gaud-owned window is tagged with `@gaud-orchestrator=<id>` and pane
   titles follow `<role>:<workstream>:<milestone>`; cleanup via
   `gaud-tmux-layout retire` / `gaud-tmux-layout end` refuses to touch any

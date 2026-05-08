@@ -72,6 +72,11 @@ When that binary preflight reports `BINARY_UPGRADE_AVAILABLE gaud-poll <old>
 so the local skill checkout can update before the binary reconcile step rebuilds
 from current local sources.
 
+`gaud-tmux-layout` keeps `gaud-poll` visible beside the orchestrator: the
+current launch window is tagged as the `gaud` window, `gaud-poll watch` runs as a
+split in that same window, and implementers normally run in a private tmux
+server. The same-session `impl` window is retained only as a fallback.
+
 Canonical skill name:
 - `gaud-mode`
 

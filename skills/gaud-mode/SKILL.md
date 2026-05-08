@@ -143,8 +143,8 @@ Before launch:
 - show the usage summary, including remaining percentage and reset timing, and ask the user for agent choices when the preflight makes the best map non-obvious
 - verify the chosen orchestrator CLI and implementer CLIs exist
 - reconcile `gaud-poll` with `"$_GAUD_DIR/bin/gaud-poll-install"` so the preferred poller path rebuilds only when the binary is missing, stale, corrupt, or explicitly forced
-- run `"$_GAUD_DIR/bin/gaud-tmux-layout" init --orchestrator <id>` to create the dashboard (`gaud`) and implementer (`impl`) windows
-- **launch `gaud-poll watch` in the dashboard pane** — use `"$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --window gaud --role poll --command 'gaud-poll watch ...'` to replace the placeholder shell with the live poller. This MUST happen before any implementer is launched. Verify the pane is running `gaud-poll` (not sitting at a shell prompt) before proceeding.
+- run `"$_GAUD_DIR/bin/gaud-tmux-layout" init --orchestrator <id>` to tag the current orchestrator window as `gaud` and create the fallback `impl` window
+- **launch `gaud-poll watch` beside the orchestrator** — use `"$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --window gaud --role poll --command 'gaud-poll watch ...'` to split the current window. This MUST happen before any implementer is launched. Verify a `poll:*` pane exists in the orchestrator window before proceeding.
 - record the conductor pane with `tmux display-message -p '#{pane_id}'`
 - tell each implementer its role name, milestone, workstream, orchestrator agent, and conductor pane ID
 
@@ -203,37 +203,33 @@ Use the bundled helper so the user never loses track of the run:
 
 Layout contract:
 - The conductor stays in whatever window the user already has open. Gaud never renames or moves that window.
-- For tmux-first runs, gaud opens one visible dashboard window in the user's tmux session. This window runs `gaud-poll watch` and shows per-agent status (`starting`, `working`, `done`, `waiting`, `stuck`, `dead`) with spinners.
+- For tmux-first runs, gaud splits the conductor window and runs `gaud-poll watch` in the neighboring pane so the user sees orchestrator + dashboard together.
+- The dashboard shows per-agent status (`starting`, `working`, `done`, `waiting`, `stuck`, `dead`), elapsed time, last update time, wrapped details, and a short event timeline.
 - Implementers should run in gaud's private tmux server whenever possible: `tmux -L gaud-<plan> new-session -d -s <plan>`.
-- `gaud-poll` stays in the user's tmux session and polls implementers with `--tmux-socket gaud-<plan>`, then forwards callbacks to the conductor pane with the normal current-session `tmux-cli send` path.
-- If private tmux is unavailable, gaud may fall back to the old same-session layout:
-  - `gaud` — holds `gaud-poll` plus any observer panes (UX/UI, Integrator, TPM, Investigator) as splits
-  - `impl` — holds 1-2 implementer panes, tiled; grow past 2 only when the plan clearly needs it
-- Each new window is tagged with `@gaud-orchestrator=<id>` and `@gaud-window={gaud|impl}`. Cleanup reads those tags, never window names.
+- `gaud-poll` stays in the user's tmux session and polls implementers with `--tmux-socket gaud-<plan>`, then forwards callbacks to the conductor pane with direct current-session `tmux send-keys` plus Enter verification.
+- If private tmux is unavailable, gaud may fall back to the same-session `impl` window for 1-2 implementer panes, tiled; grow past 2 only when the plan clearly needs it.
+- The conductor window is tagged with `@gaud-orchestrator=<id>` and `@gaud-window=gaud`; fallback implementer windows are tagged with `@gaud-window=impl`. Cleanup reads those tags, never window names.
 - Pane identity lives in the pane title: `<role>:<workstream>:<milestone>` (for example `impl:frontend:M1`, `poll:dark-mode:*`, `ux:dark-mode:M1`).
 - While gaud is running, the helper flips `renumber-windows on` for the session so retiring panes does not leave index gaps. The previous value is saved and restored on `end`.
 
 Mandatory call sequence (every bullet must execute, in order):
 
 ```bash
-# 1. Create dashboard (gaud) and implementer (impl) windows
+# 1. Tag the current orchestrator window as gaud and create fallback impl window
 "$_GAUD_DIR/bin/gaud-tmux-layout" init --orchestrator <id>
 
 # 2. Record the conductor pane ID BEFORE anything else uses it
 CONDUCTOR_PANE=$(tmux display-message -p '#{pane_id}')
 
-# 3. Start gaud-poll in the dashboard pane — this replaces the shell placeholder
+# 3. Start gaud-poll as a split next to the orchestrator pane
 "$_GAUD_DIR/bin/gaud-tmux-layout" add-pane --orchestrator <id> --window gaud \
   --role poll --workstream <id> --milestone '*' \
   --command 'gaud-poll watch --title <plan> --tmux-socket gaud-<plan> -c <conductor> -p <pane>:<role>:<cmd>'
 
-# 4. Verify the poller pane exists and has the right title before launching implementers
+# 4. Verify the poller pane exists in the orchestrator window before launching implementers
 GAUD_WIN=$("$_GAUD_DIR/bin/gaud-tmux-layout" list --orchestrator <id> | awk '/\[gaud\]/ {print $1}')
-POLLER_TITLE=$(tmux list-panes -t "$GAUD_WIN" -F '#{pane_title}' | head -1)
-case "$POLLER_TITLE" in
-  poll:*) ;;  # pane was tagged with --role poll → poller is live
-  *) echo "ERROR: dashboard pane is not running gaud-poll (title=$POLLER_TITLE). Run add-pane --window gaud --role poll first."; exit 1 ;;
-esac
+tmux list-panes -t "$GAUD_WIN" -F '#{pane_title}' | grep -q '^poll:' \
+  || { echo "ERROR: no poll:* pane in orchestrator window. Run add-pane --window gaud --role poll first."; exit 1; }
 
 # 5. Private implementer server named after the plan
 tmux -L gaud-<plan> new-session -d -s <plan>
@@ -251,7 +247,7 @@ tmux -L gaud-<plan> new-window -t <plan> -n impl-frontend \
 
 The helper refuses to touch a window that is not tagged with the current orchestrator id and will not kill the conductor window even by accident.
 
-Non-tmux conductor support is intentionally a later backend. Keep the poller/conductor transport abstract enough that `tmux-cli send` can be replaced by a stdin pipe or FIFO without changing the implementer polling loop.
+Non-tmux conductor support is intentionally a later backend. Keep the poller/conductor transport abstract enough that direct `tmux send-keys` can be replaced by a stdin pipe or FIFO without changing the implementer polling loop.
 
 ## Milestone Loop
 
@@ -263,12 +259,14 @@ Canonical loop:
 
 When the orchestrator sees `summary=suspected-stuck: ...`, it should inspect the pane, verify liveness, and decide whether to retry, relaunch, or escalate. Do not treat suspected-stuck notifications as ordinary product ambiguity.
 
+When gaud-poll sees a worker `GAUDMODE done ...` callback, it forwards the callback to the conductor, kills that completed pane, and unwatches it. This prevents completed panes that later drop to a shell from producing stale `suspected-stuck` loops.
+
 Keep only one active milestone at a time.
 
 After an accepted milestone:
 - retire the implementer panes used for that milestone. In private-tmux mode, target the private server directly, for example `tmux -L gaud-<plan> kill-window -t <plan>:impl-<workstream>` or kill the specific private pane/window launched for that milestone. In same-session fallback mode, use `"$_GAUD_DIR/bin/gaud-tmux-layout" retire --orchestrator <id> --milestone <m> --role impl`.
 - relaunch fresh implementers for the next milestone
-- at the end of the program, stop the private tmux server with `tmux -L gaud-<plan> kill-session -t <plan>` and run `"$_GAUD_DIR/bin/gaud-tmux-layout" end --orchestrator <id>` to close the visible dashboard window without touching the conductor window. In same-session fallback mode, `end` closes the `gaud` and `impl` windows.
+- at the end of the program, stop the private tmux server with `tmux -L gaud-<plan> kill-session -t <plan>` and run `"$_GAUD_DIR/bin/gaud-tmux-layout" end --orchestrator <id>` to close fallback `impl` windows without touching the conductor window. The poller split is retired separately when gaud ends.
 
 ## Guardrails
 
@@ -277,7 +275,7 @@ After an accepted milestone:
 - never launch implementers without the real conductor pane ID
 - never skip the usage-aware agent preflight before launching panes; but do not let preflight failures or uncertain status block launch — report findings, flag uncertain agents, and proceed
 - prefer the healthiest available configured agent per role; when all configured agents are uncertain (unknown/auth-blocked/unchecked), launch with the user's chosen role map and handle runtime failures by retrying with a fallback agent
-- never launch implementers without a live `gaud-poll watch` in the dashboard pane; the `gaud` window's first pane must have a `pane_title` matching `poll:*` (set by `--role poll` in `add-pane`) — verify before starting any implementer launch sequence. A bare shell prompt in the dashboard pane means the poller was never started.
+- never launch implementers without a live `gaud-poll watch` split beside the orchestrator in the conductor window; at least one pane in the `gaud` window must have a `pane_title` matching `poll:*` (set by `--role poll` in `add-pane`) — verify before starting any implementer launch sequence. A bare shell prompt in the dashboard pane means the poller was never started.
 - never treat a shell-dropped pane as healthy
 - never trust callback examples copied from prompt text as real callbacks
 - never start the next milestone before the current one is accepted or explicitly reworked

@@ -2,10 +2,10 @@
 # gaud-tmux-layout — opinionated tmux window/pane layout for gaud-mode.
 #
 # Layout contract:
-#   - The conductor stays in the caller's current tmux window. Never touched.
-#   - Gaud adds at most two windows immediately to the right:
-#       "gaud" — gaud-poll plus observer panes (ux, intg, tpm, inv) as splits
-#       "impl" — 1-2 implementer panes (more only if the plan clearly needs it)
+#   - The conductor stays in the caller's current tmux window.
+#   - The current window is tagged as "gaud" and gets gaud-poll as a split pane.
+#   - Gaud adds at most one fallback window immediately to the right:
+#       "impl" — same-session implementer panes when private tmux is unavailable
 #   - Windows are tagged with user options:
 #       @gaud-orchestrator=<id>
 #       @gaud-window={gaud|impl}
@@ -58,7 +58,14 @@ list_gaud_windows() {
 
 find_gaud_window() { # orchestrator id, kind → window_id (or empty)
   local orch=$1 kind=$2
-  list_gaud_windows "$orch" | awk -F'|' -v k="$kind" '$4==k {print $1; exit}'
+  local win_id win_name sess_id gwin orch_id
+  while IFS='|' read -r win_id win_name sess_id gwin orch_id; do
+    [ -n "$win_id" ] || continue
+    if [ "$gwin" = "$kind" ]; then
+      printf '%s\n' "$win_id"
+      return 0
+    fi
+  done < <(list_gaud_windows "$orch")
 }
 
 tag_window() {
@@ -109,12 +116,14 @@ cmd_init() {
     tmux set-option -t "$target_sess" renumber-windows on >/dev/null
   fi
 
-  # Create impl first, then gaud, so final order is conductor → gaud → impl.
+  # The current window is the gaud dashboard window: orchestrator + gaud-poll.
+  # Implementers normally live in the private tmux server; impl is fallback only.
   local impl_win gaud_win
+  gaud_win="$target_win"
   impl_win=$(tmux new-window -d -a -t "$target_win" -n impl -P -F '#{window_id}')
-  gaud_win=$(tmux new-window -d -a -t "$target_win" -n gaud -P -F '#{window_id}')
 
   tag_window "$gaud_win" "$orch" gaud
+  tmux set-option -w -t "$gaud_win" @gaud-placeholder 0 >/dev/null
   tag_window "$impl_win" "$orch" impl
 
   printf 'init orchestrator=%s gaud=%s impl=%s\n' "$orch" "$gaud_win" "$impl_win"
@@ -257,6 +266,16 @@ cmd_end() {
     [ -n "$win_id" ] || continue
     [ "$(tmux_get_w "$win_id" @gaud-orchestrator)" = "$orch" ] || continue
     if [ "$win_id" = "$current_win" ]; then
+      local pane title
+      while IFS='|' read -r pane title; do
+        [ -n "$pane" ] || continue
+        case $title in
+          poll:*)
+            tmux kill-pane -t "$pane" 2>/dev/null || true
+            printf 'killed poller pane=%s title=%s\n' "$pane" "$title"
+            ;;
+        esac
+      done < <(tmux list-panes -t "$win_id" -F '#{pane_id}|#{pane_title}' 2>/dev/null || true)
       printf 'skipped current window %s (conductor)\n' "$win_id"
       continue
     fi
@@ -303,10 +322,10 @@ USAGE
   gaud-tmux-layout end        --orchestrator <id>
 
 LAYOUT
-  conductor window (untouched)  →  visible "gaud" dashboard window
+  conductor window (tagged "gaud") contains orchestrator + gaud-poll split
   implementers usually run in a gaud-owned private tmux server:
     tmux -L gaud-<plan> new-session -d -s <plan>
-  Same-session "impl" windows are retained as a fallback.
+  Same-session "impl" window is retained as a fallback.
   Pane titles use the form:  <role>:<workstream>:<milestone>
   Examples:                  poll:dark-mode:*    impl:frontend:M1
 
