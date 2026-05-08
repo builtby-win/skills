@@ -105,7 +105,7 @@ describe("build info", () => {
 
     expect(metadata).toMatchObject({
       name: "@builtby.win/gaud-poll",
-      version: "0.2.0",
+      version: "0.2.2",
     });
     expect(metadata.fingerprint).toMatch(/^sha256:/);
   });

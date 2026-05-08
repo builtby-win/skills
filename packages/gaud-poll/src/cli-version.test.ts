@@ -16,7 +16,7 @@ describe("gaud-poll CLI version flags", () => {
       const exitCode = await proc.exited;
 
       expect({ exitCode, stderr, stdout }).toMatchObject({ exitCode: 0, stderr: "" });
-      expect(stdout.trim()).toBe("gaud-poll 0.2.0");
+      expect(stdout.trim()).toBe("gaud-poll 0.2.2");
     });
   }
 });

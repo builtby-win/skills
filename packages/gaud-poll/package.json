@@ -1,6 +1,6 @@
 {
   "name": "@builtby.win/gaud-poll",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Polling daemon for gaud-mode — monitors tmux specialist panes for GAUDMODE callbacks and stuck states",
   "keywords": ["gaud", "gaud-mode", "tmux", "polling", "callbacks"],
   "author": "builtby-win",

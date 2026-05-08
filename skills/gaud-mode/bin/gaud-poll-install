@@ -70,6 +70,9 @@ link_to_path() {
   fi
   mkdir -p "$link_dir"
   ln -sf "$source_bin" "$link_dir/gaud-poll"
+  if [ -f "$(dirname "$source_bin")/gaud-poll.build.json" ]; then
+    ln -sf "$(dirname "$source_bin")/gaud-poll.build.json" "$link_dir/gaud-poll.build.json"
+  fi
   if [ "$QUIET_CURRENT" -eq 0 ] || [ "$CURRENT_ONLY" -eq 0 ]; then
     echo "Linked: $link_dir/gaud-poll → $source_bin"
   fi
