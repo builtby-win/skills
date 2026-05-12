@@ -148,7 +148,7 @@ Before launch:
 - record the conductor pane with `tmux display-message -p '#{pane_id}'`
 - tell each implementer its role name, milestone, workstream, orchestrator agent, and conductor pane ID
 
-Gaud runs from one markdown execution plan.
+Gaud runs from one markdown execution plan, kept as a local file only.
 
 The plan must include:
 - `PRD`
@@ -156,7 +156,8 @@ The plan must include:
 - one current milestone with explicit `Milestone DONE Criteria`
 - tickets for the current milestone only
 
-Use `skills/gaud-mode/references/markdown-plan-template.md` as the source of truth.
+Do not push the plan to GitHub, create issues, PRs, or any other
+remote artifact. Keep everything local.
 
 ## Callback Transport
 
