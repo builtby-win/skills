@@ -11,6 +11,7 @@ set -euo pipefail
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FORCE_REBUILD=0
 QUIET_CURRENT=0
+GAUD_DIR=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -19,6 +20,11 @@ while [ "$#" -gt 0 ]; do
       ;;
     --quiet-current)
       QUIET_CURRENT=1
+      ;;
+    --gaud-dir)
+      GAUD_DIR="$2"
+      shift 2
+      continue
       ;;
     *)
       echo "ERROR: unknown argument: ${1}" >&2
@@ -85,6 +91,7 @@ find_package_dir() {
     "$SKILL_DIR/../../../packages/gaud-poll"
     "$SKILL_DIR/../../packages/gaud-poll"
     "$SKILL_DIR/../gaud-poll"
+    "$PWD/packages/gaud-poll"
   )
   for d in "${candidates[@]}"; do
     if [ -f "$d/package.json" ]; then
